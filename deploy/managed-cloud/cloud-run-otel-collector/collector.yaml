@@ -1,0 +1,34 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:${env:PORT}
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 200
+    send_batch_max_size: 200
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 65
+    spike_limit_percentage: 20
+  resourcedetection:
+    detectors: [gcp]
+
+exporters:
+  googlecloud:
+    project: ${env:GOOGLE_CLOUD_PROJECT}
+    log:
+      default_log_name: opentelemetry-collector
+
+extensions:
+  health_check:
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [resourcedetection, memory_limiter, batch]
+      exporters: [googlecloud]

@@ -1,0 +1,18 @@
+# harness-core — shared types + cross-axis utilities. uv workspace member.
+# Authority: CLAUDE.md §3.3 (Repo layout — "harness-core/ hosts shared types + cross-axis utilities").
+
+[project]
+name = "harness-core"
+version = "0.0.0"
+description = "H_T shared types + cross-axis utilities"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.10",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/harness_core"]

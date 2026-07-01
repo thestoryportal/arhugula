@@ -1,0 +1,41 @@
+# harness-od — Operational Discipline (OD) axis. uv workspace member.
+# Authority: harness-od/CLAUDE.md; OD plan v2.4 (U-OD-01 .. U-OD-34).
+# Owns 15-namespace OTel ingestion map + in-process OTLP collector (sqlite via stdlib).
+
+[project]
+name = "harness-od"
+version = "0.0.0"
+description = "H_T Operational Discipline (OD) axis"
+requires-python = ">=3.12"
+dependencies = [
+    "harness-core",
+    "harness-as",
+    # OD→CP consumer edges (canonical CXA §2.3.3, 12 edges; OD ingests CP-emitted
+    # namespaces incl. `engine.*`). src reads `ReplayDisposition`
+    # (harness_cp.engine_namespace) READ-ONLY for idempotency join/dedup + cross-family
+    # rollup; the pause-resume audit-projection surface consumes
+    # harness_cp.pause_resume_protocol types. cp's deps are {core, as} (no od) → acyclic-safe.
+    # (The reverse CP→OD audit seam, CXA §2.3.7, is mediated through harness-cxa — no
+    # direct cp→od import — so the two directions do not form a package cycle.)
+    "harness-cp",
+    # OD→IS consumer edges (canonical CXA §2.3.4): tests consume IS substrate types
+    # (Identifier, Actor, ActorClass from harness_is.state_ledger_entry_schema). is's deps
+    # are {core} → acyclic-safe. See .harness/class_3_drift_od_cp_undeclared_dependency.md.
+    "harness-is",
+    "opentelemetry-api>=1.30",
+    "opentelemetry-sdk>=1.30",
+    "opentelemetry-exporter-otlp>=1.30",
+]
+
+[tool.uv.sources]
+harness-core = { workspace = true }
+harness-as = { workspace = true }
+harness-cp = { workspace = true }
+harness-is = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/harness_od"]

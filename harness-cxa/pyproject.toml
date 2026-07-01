@@ -1,0 +1,32 @@
+# harness-cxa — Cross-Axis Composition (CXA) seam instantiation. uv workspace member.
+# Authority: CLAUDE.md §2.5 ("harness-cxa/ hosts CXA seam instantiation");
+#            Cross_Axis_Composition_Document_v2_3.md (92 cross-axis relationships, 6 buckets;
+#            22 genuine typed seams, 49 convention-level, 24 phase-2-runtime).
+# Activated at sub-phase 7c against composed terminal exporter manifests of all 4 axes.
+
+[project]
+name = "harness-cxa"
+version = "0.0.0"
+description = "H_T Cross-Axis Composition (CXA) seam instantiation"
+requires-python = ">=3.12"
+dependencies = [
+    "harness-core",
+    "harness-is",
+    "harness-as",
+    "harness-cp",
+    "harness-od",
+]
+
+[tool.uv.sources]
+harness-core = { workspace = true }
+harness-is = { workspace = true }
+harness-as = { workspace = true }
+harness-cp = { workspace = true }
+harness-od = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/harness_cxa"]

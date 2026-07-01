@@ -1,0 +1,181 @@
+# harness.toml.example — operator-facing runtime configuration template
+#
+# Copy this file to `harness.toml` at your workspace root and edit it. The
+# `just run` / `just daemon` recipes pass `--config harness.toml` for you;
+# invoking the CLI directly, use `harness run <manifest> --config harness.toml`.
+# Per runtime spec v1.39 §3.7, config precedence is env (HARNESS_*) →
+# harness.toml → CLI flags (lowest → highest priority).
+#
+# If `--config` is omitted, the CLI discovers `harness.toml` in the process
+# current working directory. The `just run` / `just daemon` recipes still pass
+# `--config harness.toml` explicitly for operator clarity.
+#
+# This template covers the 4 required fields plus the most common
+# optional knobs. Defaults documented inline; see
+# `harness-runtime/src/harness_runtime/types.py` `RuntimeConfig` class
+# for the full field-set + docstrings.
+#
+# DO NOT put secrets (API keys, passwords, tokens) in this file —
+# secrets MUST flow through the OS keyring per ADR-F5; plaintext-secret
+# detection at the loader will reject the file with
+# `RT-FAIL-CLI-CONFIG-LOAD`.
+
+[runtime]
+
+# REQUIRED. Deployment surface — one of:
+#   "local-development"   — operator's laptop; full HITL palette; head-based sampling
+#   "self-hosted-server"  — long-running server; reduced palette; tail-based sampling
+#   "managed-cloud"       — managed deployment; minimal palette; aggressive sampling
+deployment_surface = "local-development"
+
+# REQUIRED. Absolute path to the workspace root. The harness reads/writes
+# state under `<repository_root>/.harness/` per ADR-F2. Must exist.
+repository_root = "/absolute/path/to/your/workspace"
+
+# REQUIRED. Default topology pattern when a workflow does not specify
+# its own. One of (per ADR-D4 v1.1):
+#   "single-threaded-linear"
+#   "orchestrator-workers"
+#   "decentralized-handoff"
+#   "hierarchical-delegation"
+#   "evaluator-optimizer"
+#   "parallelization"
+default_topology = "single-threaded-linear"
+
+# Optional. Multi-tenant separation key; None = single-tenant.
+# tenant_id = "team-alpha"
+
+# Optional provider construction allowlist flags. If True, the named
+# provider may fail at stage 3a (keyring miss / network unreachable)
+# without halting bootstrap (it surfaces as `RT-FAIL-PROVIDER-DEGRADED`
+# warning and bootstrap continues without that provider in the context).
+# Auth errors (401/403) ALWAYS surface regardless of these flags.
+# Defaults: anthropic = openai = False (hard-fail); ollama = False.
+# For operators without all three keyring entries, set the unwanted
+# providers to True.
+anthropic_optional = false
+openai_optional = true
+ollama_optional = true
+
+# Optional. Ollama daemon host URL; None falls back to the SDK default
+# `http://localhost:11434`.
+# ollama_host = "http://localhost:11434"
+
+
+# Provider secret backend selection. This table carries selector metadata
+# only. Do not put API keys, tokens, passwords, or other secret values here.
+[runtime.provider_secrets]
+# LOCAL default: keyring first, vendor env-var fallback second.
+backend = "local-keyring-env-fallback"
+
+# SELF_HOSTED_SERVER: keyring only; env fallback disabled.
+# backend = "self-hosted-keyring"
+
+# Optional OS-keyring service name. Default: "harness".
+keyring_service = "harness"
+
+
+# REQUIRED. OTel exporter configuration.
+[runtime.otel]
+# REQUIRED. OTLP endpoint URL; must include a `://` scheme.
+otlp_endpoint = "http://localhost:4318"
+
+# Optional. Override the per-deployment-surface sampler mode. None →
+# defer to `harness_od.sampling_mode.PER_DEPLOYMENT_SURFACE_SAMPLING`.
+# sampling_mode = "head-based"
+
+
+# REQUIRED at bootstrap stage IS-1: 4 path bindings covering the
+# `PathClass` enum (SKILLS / PROMPTS / ROUTING_MANIFEST / STATE_LEDGER).
+# Each binding maps a (path_class, workflow_class, deployment_surface)
+# tuple to an absolute filesystem path.
+#
+# IMPORTANT — `workflow_class` MUST match the `[workflow].workload_class`
+# of the manifests you intend to run, or bootstrap stage IS-1 will not
+# find a binding for that workflow. The values below are
+# "pipeline-automation" to match the shipped `examples/minimal.toml`
+# (the MVP smoke). If you run software-engineering workflows instead,
+# change all four to "software-engineering" (or add a second set of four).
+[[runtime.path_bindings.raw_entries]]
+path_class = "SKILLS"
+workflow_class = "pipeline-automation"
+deployment_surface = "local-development"
+path = "/absolute/path/to/your/workspace/skills"
+
+[[runtime.path_bindings.raw_entries]]
+path_class = "PROMPTS"
+workflow_class = "pipeline-automation"
+deployment_surface = "local-development"
+path = "/absolute/path/to/your/workspace/prompts"
+
+[[runtime.path_bindings.raw_entries]]
+path_class = "ROUTING_MANIFEST"
+workflow_class = "pipeline-automation"
+deployment_surface = "local-development"
+path = "/absolute/path/to/your/workspace/routing_manifest"
+
+[[runtime.path_bindings.raw_entries]]
+path_class = "STATE_LEDGER"
+workflow_class = "pipeline-automation"
+deployment_surface = "local-development"
+path = "/absolute/path/to/your/workspace/.harness/state.jsonl"
+
+
+# REQUIRED for any workflow that dispatches an inference step: the routing
+# manifest must carry at least one fallback chain. Bootstrap stage 3b
+# CP_ROUTING raises `FallbackChainBindError` if `fallback_chains` is empty.
+# The chain below routes to anthropic/claude-haiku-4-5 (matching the shipped
+# examples/minimal.toml). `manifest_version`, `per_role_bindings`,
+# `per_workload_overrides`, and `retry_policies` are all required keys (the
+# RoutingManifest model forbids extras); empty values are fine for the MVP.
+[runtime.routing_manifest]
+manifest_version = 1
+per_role_bindings = {}
+per_workload_overrides = {}
+retry_policies = {}
+fallback_chains = [
+    { primary = { provider = "anthropic", model = "claude-haiku-4-5", family = "anthropic" }, same_family = [], cross_family = [] },
+]
+
+
+# ---------------------------------------------------------------------------
+# Silencing the `ProviderDegradedWarning` (probe-v4 adjacent finding (c))
+# ---------------------------------------------------------------------------
+#
+# When `anthropic_optional` / `openai_optional` / `ollama_optional` is `true`
+# AND the corresponding provider construction fails (e.g., no API key in
+# keyring, or no local Ollama daemon running), stage 3a CP_CLIENTS emits a
+# `ProviderDegradedWarning` via `warnings.warn` per Spec_Harness_Runtime_v1
+# §5 mandate ("Surface typed warning; stage continues with reduced-provider
+# context"). The warning is spec-canonical — production cannot silence it
+# unilaterally without an X-AL-3 spec amendment.
+#
+# Operators who have intentionally opted into the degraded surface (the
+# `*_optional=true` declaration) and don't need the per-invocation warning
+# noise can suppress it via the standard Python warnings filter:
+#
+#   export PYTHONWARNINGS="ignore:provider="
+#
+# Caveats:
+#
+# 1. The filter syntax above is a message-prefix REGEX matched at the start
+#    of the warning message. It silences any future warning whose message
+#    begins with "provider=" (low collision risk; the harness uses this
+#    prefix exclusively at ProviderDegradedWarning emission sites).
+#
+# 2. The "obvious" category-name filter
+#    `PYTHONWARNINGS="ignore::harness_runtime.lifecycle.providers.ProviderDegradedWarning"`
+#    does NOT work — Python's `-W` / `PYTHONWARNINGS` parser only accepts
+#    built-in warning categories (DeprecationWarning, UserWarning, etc.),
+#    not custom subclasses defined in third-party modules.
+#
+# 3. Python's `warnings` module deduplicates by `(category, filename, lineno)`
+#    per process by default. The warning fires ONCE per `harness run` /
+#    `harness daemon` invocation, not on every operation within a session.
+#    For long-running daemon mode the warning is essentially one-shot at
+#    startup; for one-shot CLI iteration (`harness run foo.toml` repeated)
+#    the filter above eliminates the per-invocation noise.
+#
+# 4. Auth errors (HTTP 401/403 from the provider) ALWAYS surface as
+#    `ProviderAuthError` per Spec §5 row 2083 and are NOT silenced by this
+#    filter — they raise, halting bootstrap regardless of `*_optional`.

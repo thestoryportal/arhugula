@@ -1,0 +1,99 @@
+# harness-runtime — composition root for H_T. uv workspace member.
+#
+# Authority:
+#   - CLAUDE.md §3.3 (Repo layout); Phase 2 Session 3 plan v2.1 §1 (Package layout)
+#   - design-substrate/Spec_Harness_Runtime_v1.md v1.1 (14 contracts C-RT-01..C-RT-14)
+#   - F-P2-1..F-P2-5 resolutions (.harness/phase_2_fork_F-P2-*.md)
+#
+# Scope: instantiates and wires the axis libraries into a startable Python process.
+# Owns: bootstrap orchestration (9 stages), provider SDK lifecycle, TracerProvider
+# lifecycle, in-process OTLP collector daemon supervision, runtime composition
+# primitives (Protocol stubs at L0 per Class 2 Tension 2026-05-19; concretized
+# at L2–L6).
+
+[project]
+name = "harness-runtime"
+version = "0.0.0"
+description = "H_T composition root — multi-LLM agent harness runtime"
+requires-python = ">=3.12"
+dependencies = [
+    # Workspace axis libraries.
+    "harness-core",
+    "harness-is",
+    "harness-as",
+    "harness-cp",
+    "harness-od",
+    "harness-cxa",
+    # Schema layer.
+    "pydantic>=2.10",
+    # Multi-LLM provider SDKs (ADR-F1 v1.2; NOT LiteLLM). Construction lands
+    # at L4 (U-RT-17..U-RT-20); declared here per the workspace convention
+    # (root pyproject "owning axis packages re-declare; uv dedupes").
+    "anthropic>=0.45",
+    "openai>=1.60",
+    "ollama>=0.4",
+    # MCP host + client (FastMCP). Host startup lands at U-RT-15.
+    "mcp>=1.2",
+    # OS keyring (ADR-F5 v1.1). Resolver driver lands at U-RT-06.
+    "keyring>=25.5",
+    # GCP Secret Manager backend for R-421 MANAGED_CLOUD provider secrets.
+    "google-cloud-secret-manager>=2.0",
+    # OTel — TracerProvider + BSP + OTLP exporter lifecycle at L6 (U-RT-27/28/29).
+    "opentelemetry-api>=1.30",
+    "opentelemetry-sdk>=1.30",
+    "opentelemetry-exporter-otlp>=1.30",
+    # Operator-facing CLI dispatcher (Q-I=c at G1, spec v1.35 §14.18). U-RT-102.
+    "typer>=0.12",
+    # 3-source layered RuntimeConfig loader (spec v1.35 §3.7, Q-C=β). U-RT-103.
+    "pydantic-settings>=2.0",
+    # YAML workflow manifest parser. spec v1.39 §14.19 Reading A re-litigates
+    # Q-H=b (pyyaml replaces strictyaml; closes probe finding #16/#17 native
+    # scalar coercion gap). Strictness preserved via StrictSafeLoader subclass
+    # at `lifecycle/strict_safe_loader.py`. U-RT-104.
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# R-FS-1 L2 — the light in-process embedding realization (Option B,
+# 2026-06-16): fastembed (Qdrant's ONNX-backed embedder; torch-free,
+# x86-macOS-stable). Lazy-imported in `lifecycle/embedding_resolution.py` and
+# OPTIONAL: the base install stays light + the provider-free lanes never pull
+# onnxruntime, because Layer-2 EMBEDDING is production-inert until R-300 makes
+# DECLARATIVE conditional. Promote to a required dependency at that activation
+# (forward note: `.harness/beyond-mvp-capability-boundary-ledger.md`
+# B-L2-EMBEDDING-ACTIVATION). NOT torch / sentence-transformers (would undercut
+# the portability Option B was chosen for).
+#
+# onnxruntime<1.24: fastembed's ONNX backend. onnxruntime 1.24+ DROPPED the
+# x86-64 macOS wheel (the operator's current dev machine — Intel Mac; the last
+# x86-mac cp312 wheel is 1.23.2). The cap is CONTAINED to this optional extra
+# (onnxruntime is pulled only by fastembed; the base install has neither) and is
+# trivially revisitable — when the operator moves to Apple Silicon (late
+# 2026/early 2027), bump/drop the cap so arm64 uses newer wheels. See
+# `[[operator-dev-machine-and-dep-preference]]` (x86-macOS-longevity).
+embedding = ["fastembed>=0.4", "onnxruntime<1.24"]
+
+[project.scripts]
+# Track A: admin-only stubs. Operator-facing `run` is Track B.
+# Wired by U-RT-47 (inspect) and U-RT-48 (shutdown-cli).
+# U-RT-47 activated 2026-05-20; U-RT-48 activated 2026-05-20 at commit landing.
+harness-inspect    = "harness_runtime.admin.inspect:main"        # U-RT-47
+harness-shutdown   = "harness_runtime.admin.shutdown_cli:main"   # U-RT-48
+# Track B: operator-facing parent dispatcher (`harness run`, `harness daemon`).
+# Cluster L9-sedecies (spec v1.35 §14.18 / §13.4); scaffolding at U-RT-102.
+harness            = "harness_runtime.cli:main"                  # U-RT-102
+
+[tool.uv.sources]
+harness-core = { workspace = true }
+harness-is   = { workspace = true }
+harness-as   = { workspace = true }
+harness-cp   = { workspace = true }
+harness-od   = { workspace = true }
+harness-cxa  = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/harness_runtime"]

@@ -1,0 +1,30 @@
+version: 1
+workflow:
+  workflow_id: "track-b-multi-step"
+  workload_class: "software-engineering"
+  persona_tier: "solo-developer"
+  engine_class: "pure-pattern-no-engine"
+  topology_pattern: "evaluator-optimizer"
+  layer_budgets: []
+  fallback_chain:
+    primary:
+      provider: "anthropic"
+      model: "claude-haiku-4-5"
+      family: "anthropic"
+    same_family: []
+    cross_family: []
+  hitl_placements: []
+  per_step_overrides: {}
+default_model_binding:
+  provider: "anthropic"
+  model: "claude-haiku-4-5"
+steps:
+  - step_id: "step-1"
+    step_kind: "inference-step"
+    step_payload: {}
+  - step_id: "step-2"
+    step_kind: "inference-step"
+    step_payload: {}
+  - step_id: "step-3"
+    step_kind: "inference-step"
+    step_payload: {}

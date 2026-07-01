@@ -1,0 +1,29 @@
+# harness-cp — Control Plane (CP) axis. uv workspace member.
+# Authority: harness-cp/CLAUDE.md; CP plan v2.3 (U-CP-01 .. U-CP-55).
+# Multi-LLM routing core via per-provider official SDKs under capability-aware
+# abstraction per ADR-F1 v1.2 — hand-rolled, NOT LiteLLM (CLAUDE.md §3.2 / I-6).
+
+[project]
+name = "harness-cp"
+version = "0.0.0"
+description = "H_T Control Plane (CP) axis"
+requires-python = ">=3.12"
+dependencies = [
+    "harness-core",
+    "harness-as",                     # Cross-axis CP→AS edges (CXA v2.1 §2.3.4)
+    "anthropic>=0.45",                # Multi-LLM SDK — Anthropic
+    "openai>=1.60",                   # Multi-LLM SDK — OpenAI
+    "ollama>=0.4",                    # Multi-LLM SDK — local tier
+    "opentelemetry-api>=1.30",        # C-OD-25 §25.1 workflow.envelope span (U-OD-35)
+]
+
+[tool.uv.sources]
+harness-core = { workspace = true }
+harness-as = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/harness_cp"]

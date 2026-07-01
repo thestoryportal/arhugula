@@ -1,0 +1,383 @@
+# pyproject.toml — uv workspace root for the H_T multi-LLM agent harness build.
+#
+# Authority:
+#   - CLAUDE.md §3.1 "Committed stack"  + §3.2 "Framework-pull discipline" + §3.3 "Repo layout"
+#   - Target_Stack_Commitment_v1.md §5.1 + §5.2 (Python 3.12+ / Pydantic v2 / uv / pyright / ruff / pytest)
+#   - Plan_Executability_Audit_v1.md (framework-pull discipline)
+#
+# This is the WORKSPACE ROOT. `package = false` (see [tool.uv]) keeps the root
+# non-distributable — it carries shared config + the shared dev environment, but
+# the 6 axis packages enumerated in [tool.uv.workspace].members are the build units.
+
+[project]
+name = "harness-workspace"
+version = "0.0.0"
+description = "H_T — multi-LLM agent harness target build (Phase 7 workspace root)"
+requires-python = ">=3.12"
+
+# Shared runtime libraries — installed into the single workspace .venv "for shared use"
+# per Bootstrap Runbook §4.4.1. The owning axis packages re-declare the ones they use
+# as [project.dependencies] in their own pyproject.toml per Runbook §4.4.2 (uv dedupes).
+dependencies = [
+    "pydantic>=2.10",          # Type contracts — Pydantic v2 (Target Stack §5.1 / C-STK-08)
+    "anthropic>=0.45",         # Multi-LLM SDK — Anthropic    (per-provider SDKs, ADR-F1 v1.2; NOT LiteLLM)
+    "openai>=1.60",            # Multi-LLM SDK — OpenAI
+    "ollama>=0.4",             # Multi-LLM SDK — local tier
+    "mcp>=1.2",                # MCP host + client — official modelcontextprotocol/python-sdk (FastMCP)
+    "keyring>=25.5",           # Secrets — python-keyring OS-keyring abstraction (ADR-F5 v1.1)
+    "google-cloud-secret-manager>=2.0",  # Secrets — GCP Secret Manager backend for MANAGED_CLOUD
+]
+
+[dependency-groups]
+# Development tooling + observability libs — Runbook §4.4.1 "Root dev dependencies (dev group)".
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "pytest-cov>=6.0",         # Coverage measurement — R-200-ci-coverage-gating (informational at v1; general-purpose tooling, not a framework-pull-discipline target)
+    "pyright>=1.1.390",
+    "ruff>=0.9",
+    "pyyaml>=6.0",
+    "opentelemetry-api>=1.30",
+    "opentelemetry-sdk>=1.30",
+    "opentelemetry-exporter-otlp>=1.30",
+    # "opentelemetry-instrumentation-genai>=0.50b0",   # [SPECULATIVE] no single PyPI package by this
+    #   name; OTel GenAI contrib instrumentation is split (opentelemetry-instrumentation-openai-v2,
+    #   opentelemetry-instrumentation-google-genai, ...). Substitute the actual split package(s) at
+    #   the AS/OD-axis units that require GenAI instrumentation. Logged as Class 3 informational.
+    "instructor>=1.15.4",
+]
+
+[tool.uv]
+package = false                # Root is not itself a buildable package.
+default-groups = ["dev"]        # `uv sync` installs the dev group by default.
+
+# Coverage config — R-200-ci-coverage-gating (informational at v1; NO threshold —
+# "gather data first" per Project_Roadmap_v1.md §5 R-200-ci-coverage-gating).
+# `source` lists the 7 workspace import packages so `pytest --cov` (no arg)
+# measures production code; test packages are omitted. The CI `coverage` job
+# (advisory) runs the non-e2e suite under coverage and publishes a summary +
+# coverage.xml artifact. No `fail_under` — a threshold lands only once a baseline
+# trend justifies it (tracked as a future tightening, mirroring lint/typecheck).
+[tool.coverage.run]
+branch = true
+source = [
+    "harness_core",
+    "harness_is",
+    "harness_as",
+    "harness_cp",
+    "harness_od",
+    "harness_cxa",
+    "harness_runtime",
+]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+
+[tool.uv.workspace]
+members = [
+    "harness-core",
+    "harness-is",
+    "harness-as",
+    "harness-cp",
+    "harness-od",
+    "harness-cxa",
+    "harness-runtime",
+]
+
+[tool.pyright]
+typeCheckingMode = "strict"
+pythonVersion = "3.12"
+include = [
+    "harness-core/src",    "harness-core/tests",
+    "harness-is/src",      "harness-is/tests",
+    "harness-as/src",      "harness-as/tests",
+    "harness-cp/src",      "harness-cp/tests",
+    "harness-od/src",      "harness-od/tests",
+    "harness-cxa/src",     "harness-cxa/tests",
+    "harness-runtime/src", "harness-runtime/tests",
+]
+exclude = ["**/__pycache__", ".venv", ".harness"]
+
+# Test modules are scoped-relaxed under R-200-ci-lint-typecheck-blocking, the
+# pyright analog to the lint half's `**/tests/**` per-file-ignores (PR #159).
+# Test code legitimately passes partial mocks/fixtures to typed constructors,
+# uses untyped lambdas, and reaches into private members — strict-mode noise that
+# the 3543 green tests already gate functionally. src/ is held to full strict.
+# One entry per harness-*/tests dir (pyright executionEnvironments.root is a
+# directory path, not a glob); kept uniform across all 7 so a new test in a
+# currently-clean dir does not newly-block once typecheck is blocking.
+[[tool.pyright.executionEnvironments]]
+root = "harness-core/tests"
+reportArgumentType = "none"
+reportAttributeAccessIssue = "none"
+reportCallIssue = "none"
+reportMissingImports = "none"
+reportMissingParameterType = "none"
+reportMissingTypeArgument = "none"
+reportOperatorIssue = "none"
+reportOptionalMemberAccess = "none"
+reportOptionalSubscript = "none"
+reportPossiblyUnboundVariable = "none"
+reportPrivateImportUsage = "none"
+reportPrivateUsage = "none"
+reportTypedDictNotRequiredAccess = "none"
+reportUnknownArgumentType = "none"
+reportUnknownLambdaType = "none"
+reportUnknownMemberType = "none"
+reportUnknownParameterType = "none"
+reportUnknownVariableType = "none"
+reportUnnecessaryCast = "none"
+reportUnusedExpression = "none"
+reportUnusedFunction = "none"
+reportUnusedImport = "none"
+reportUnusedVariable = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "harness-is/tests"
+reportArgumentType = "none"
+reportAttributeAccessIssue = "none"
+reportCallIssue = "none"
+reportMissingImports = "none"
+reportMissingParameterType = "none"
+reportMissingTypeArgument = "none"
+reportOperatorIssue = "none"
+reportOptionalMemberAccess = "none"
+reportOptionalSubscript = "none"
+reportPossiblyUnboundVariable = "none"
+reportPrivateImportUsage = "none"
+reportPrivateUsage = "none"
+reportTypedDictNotRequiredAccess = "none"
+reportUnknownArgumentType = "none"
+reportUnknownLambdaType = "none"
+reportUnknownMemberType = "none"
+reportUnknownParameterType = "none"
+reportUnknownVariableType = "none"
+reportUnnecessaryCast = "none"
+reportUnusedExpression = "none"
+reportUnusedFunction = "none"
+reportUnusedImport = "none"
+reportUnusedVariable = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "harness-as/tests"
+reportArgumentType = "none"
+reportAttributeAccessIssue = "none"
+reportCallIssue = "none"
+reportMissingImports = "none"
+reportMissingParameterType = "none"
+reportMissingTypeArgument = "none"
+reportOperatorIssue = "none"
+reportOptionalMemberAccess = "none"
+reportOptionalSubscript = "none"
+reportPossiblyUnboundVariable = "none"
+reportPrivateImportUsage = "none"
+reportPrivateUsage = "none"
+reportTypedDictNotRequiredAccess = "none"
+reportUnknownArgumentType = "none"
+reportUnknownLambdaType = "none"
+reportUnknownMemberType = "none"
+reportUnknownParameterType = "none"
+reportUnknownVariableType = "none"
+reportUnnecessaryCast = "none"
+reportUnusedExpression = "none"
+reportUnusedFunction = "none"
+reportUnusedImport = "none"
+reportUnusedVariable = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "harness-cp/tests"
+reportArgumentType = "none"
+reportAttributeAccessIssue = "none"
+reportCallIssue = "none"
+reportMissingImports = "none"
+reportMissingParameterType = "none"
+reportMissingTypeArgument = "none"
+reportOperatorIssue = "none"
+reportOptionalMemberAccess = "none"
+reportOptionalSubscript = "none"
+reportPossiblyUnboundVariable = "none"
+reportPrivateImportUsage = "none"
+reportPrivateUsage = "none"
+reportTypedDictNotRequiredAccess = "none"
+reportUnknownArgumentType = "none"
+reportUnknownLambdaType = "none"
+reportUnknownMemberType = "none"
+reportUnknownParameterType = "none"
+reportUnknownVariableType = "none"
+reportUnnecessaryCast = "none"
+reportUnusedExpression = "none"
+reportUnusedFunction = "none"
+reportUnusedImport = "none"
+reportUnusedVariable = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "harness-od/tests"
+reportArgumentType = "none"
+reportAttributeAccessIssue = "none"
+reportCallIssue = "none"
+reportMissingImports = "none"
+reportMissingParameterType = "none"
+reportMissingTypeArgument = "none"
+reportOperatorIssue = "none"
+reportOptionalMemberAccess = "none"
+reportOptionalSubscript = "none"
+reportPossiblyUnboundVariable = "none"
+reportPrivateImportUsage = "none"
+reportPrivateUsage = "none"
+reportTypedDictNotRequiredAccess = "none"
+reportUnknownArgumentType = "none"
+reportUnknownLambdaType = "none"
+reportUnknownMemberType = "none"
+reportUnknownParameterType = "none"
+reportUnknownVariableType = "none"
+reportUnnecessaryCast = "none"
+reportUnusedExpression = "none"
+reportUnusedFunction = "none"
+reportUnusedImport = "none"
+reportUnusedVariable = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "harness-cxa/tests"
+reportArgumentType = "none"
+reportAttributeAccessIssue = "none"
+reportCallIssue = "none"
+reportMissingImports = "none"
+reportMissingParameterType = "none"
+reportMissingTypeArgument = "none"
+reportOperatorIssue = "none"
+reportOptionalMemberAccess = "none"
+reportOptionalSubscript = "none"
+reportPossiblyUnboundVariable = "none"
+reportPrivateImportUsage = "none"
+reportPrivateUsage = "none"
+reportTypedDictNotRequiredAccess = "none"
+reportUnknownArgumentType = "none"
+reportUnknownLambdaType = "none"
+reportUnknownMemberType = "none"
+reportUnknownParameterType = "none"
+reportUnknownVariableType = "none"
+reportUnnecessaryCast = "none"
+reportUnusedExpression = "none"
+reportUnusedFunction = "none"
+reportUnusedImport = "none"
+reportUnusedVariable = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "harness-runtime/tests"
+reportArgumentType = "none"
+reportAttributeAccessIssue = "none"
+reportCallIssue = "none"
+reportMissingImports = "none"
+reportMissingParameterType = "none"
+reportMissingTypeArgument = "none"
+reportOperatorIssue = "none"
+reportOptionalMemberAccess = "none"
+reportOptionalSubscript = "none"
+reportPossiblyUnboundVariable = "none"
+reportPrivateImportUsage = "none"
+reportPrivateUsage = "none"
+reportTypedDictNotRequiredAccess = "none"
+reportUnknownArgumentType = "none"
+reportUnknownLambdaType = "none"
+reportUnknownMemberType = "none"
+reportUnknownParameterType = "none"
+reportUnknownVariableType = "none"
+reportUnnecessaryCast = "none"
+reportUnusedExpression = "none"
+reportUnusedFunction = "none"
+reportUnusedImport = "none"
+reportUnusedVariable = "none"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# `_bmad` + the installed `bmad-*` skill scripts are vendored third-party tooling
+# (BMAD-METHOD, MIT, kept verbatim for clean upstream re-pulls); excluded from our
+# lint/format profile like `.harness` and `design-substrate`.
+extend-exclude = [".harness", ".venv", "design-substrate", "_bmad", ".claude/skills/bmad-*", ".agents/skills/bmad-*"]
+# Honor the excludes even when a tool passes explicit file paths (the Stop-gate /
+# pre-commit / CI lint hooks enumerate changed files), so vendored `bmad-*` skill
+# scripts are skipped however ruff is invoked.
+force-exclude = true
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "ASYNC", "RUF"]
+# Design-substrate notation uses Unicode `×` (multiplication sign) and `–` (en dash)
+# intentionally in docstrings, string literals, and comments (e.g., "persona × engine"
+# matrices, "5–7 attempts" ranges). Ruff's RUF001/002/003 flag these as ambiguous
+# against ASCII lookalikes; in this codebase they are domain notation, not typos.
+#
+# ASYNC109: the harness deliberately exposes `timeout` parameters on its HITL
+# surfaces (the canonical §17.4 HITL gate signature per CP spec C-CP-17 §17.4 +
+# the AskUserQuestion surfaces) and its dispatch surfaces (step_dispatch_timeout_seconds
+# per runtime spec C-RT-03). The timeout-as-parameter pattern is intentional,
+# spec-mandated API design — not the accidental-blocking shape ASYNC109 targets;
+# rewriting to `asyncio.timeout()` context managers would break the spec signatures.
+ignore = ["RUF001", "RUF002", "RUF003", "ASYNC109"]
+
+[tool.ruff.lint.per-file-ignores]
+# Two src modules carry hand-aligned markdown tables inside docstrings (the
+# classification-trigger table + the audit-payload path-disjointness table) where
+# wrapping would destroy the column alignment — same rationale as the CP test
+# docstring tables historically carved out below.
+"harness-od/src/harness_od/tail_keep_classification.py" = ["E501"]
+"harness-od/src/harness_od/pause_resume_namespace.py" = ["E501"]
+
+# Test files carry idioms that are legitimate in test context but flagged by the
+# production-grade lint profile. Scoped to tests/ only (never src/), and excludes
+# all F-codes so real undefined-name / unused-import bugs still surface:
+#   E402  — imports after monkeypatch / sys.modules setup or sys.path fixup
+#   E501  — AC-coverage docstring tables + long inline JSON / manifest fixtures
+#   B017  — pytest.raises(Exception) as a deliberate "any-error" assertion
+#   B007  — intentionally-unused loop variables in enumeration assertions
+#   B018  — bare attribute/expression access exercised for its raise/no-raise
+#   N801/N806/N814/N817/N818 — test-fixture class/var naming + imported-constant
+#            aliases + Fail/Signal exception names mirroring production identifiers
+#   RUF006 — fire-and-forget trigger tasks whose lifetime is the test's own await
+#   RUF012/RUF015/RUF022/RUF043/RUF059 — test-fixture mutable attrs + minor style
+#   ASYNC110/ASYNC240 — faithful mocks of polling servers + module-source
+#            introspection reads (blocking is correct in the test double)
+"**/tests/**/*.py" = [
+    "E402",
+    "E501",
+    "B017",
+    "B007",
+    "B018",
+    "N801",
+    "N806",
+    "N814",
+    "N817",
+    "N818",
+    "RUF006",
+    "RUF012",
+    "RUF015",
+    "RUF022",
+    "RUF043",
+    "RUF059",
+    "ASYNC110",
+    "ASYNC240",
+]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+# `importlib` mode prevents the `ModuleNotFoundError: No module named 'tests.X'`
+# collision that arises when multiple workspace members each carry a `tests/`
+# package with `__init__.py`. Standard fix per the pytest-importmode docs.
+addopts = "--import-mode=importlib"
+markers = [
+    "e2e: end-to-end tests exercising real external services (e.g., Anthropic API); typically gated on credential env vars (ANTHROPIC_API_KEY etc.) and excluded from default CI runs",
+]
+testpaths = [
+    "harness-core/tests",
+    "harness-is/tests",
+    "harness-as/tests",
+    "harness-cp/tests",
+    "harness-od/tests",
+    "harness-cxa/tests",
+    "harness-runtime/tests",
+]

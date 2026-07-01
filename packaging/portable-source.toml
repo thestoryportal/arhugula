@@ -1,0 +1,99 @@
+[portable_source]
+name = "arhugula-harness-portable"
+description = "Runtime-first Arhugula harness source package for a clean external git repo."
+
+include_paths = [
+  ".env.example",
+  ".gitattributes",
+  ".gitignore",
+  ".python-version",
+  "deploy",
+  "docs",
+  "examples",
+  "harness-as",
+  "harness-core",
+  "harness-cp",
+  "harness-cxa",
+  "harness-is",
+  "harness-od",
+  "harness-runtime",
+  "harness.toml.example",
+  "packaging/portable-source.toml",
+  "packaging/portable",
+  "pyproject.toml",
+  "tests",
+  "tools/managed_cloud_readiness.py",
+  "tools/portable_init.py",
+  "tools/portable_source_package.py",
+  "tools/q4_packaging_gate.py",
+  "tools/r420_self_hosted_live_e2e.py",
+  "tools/r421_e2b_live_probe.py",
+  "tools/r421_managed_cloud_live_e2e.py",
+  "tools/r430_tail_keep_collector_live_e2e.py",
+  "tools/r500_multitenant_selfhosted_live_e2e.py",
+  "tools/r810_files_live_e2e.py",
+  "tools/r820_managed_agents_live_e2e.py",
+  "tools/sandbox_host_readiness.py",
+  "tools/self_hosted_readiness.py",
+  "uv.lock",
+]
+
+overlay_files = [
+  { source = "packaging/portable/README.md", target = "README.md" },
+  { source = "packaging/portable/AGENTS.md", target = "AGENTS.md" },
+  { source = "packaging/portable/justfile", target = "justfile" },
+  { source = "packaging/portable/gitignore", target = ".gitignore" },
+  { source = "packaging/portable/docs-README.md", target = "docs/README.md" },
+]
+
+scaffold_dirs = [
+  ".harness",
+  "skills",
+  "prompts",
+  "routing_manifest",
+]
+
+forbidden_names = [
+  "CLAUDE.md",
+]
+
+required_target_paths = [
+  "README.md",
+  "AGENTS.md",
+  "justfile",
+  "pyproject.toml",
+  "uv.lock",
+  "harness.toml.example",
+  ".env.example",
+  "harness-runtime",
+  "examples/minimal.toml",
+  "docs/portable-install.md",
+  "tools/portable_init.py",
+  "tools/portable_source_package.py",
+  "packaging/portable-source.toml",
+]
+
+forbidden_target_paths = [
+  ".git",
+  ".codex",
+  ".claude",
+  ".agents",
+  ".codex-worktrees",
+  ".venv",
+  "_bmad",
+  "dashboard-design",
+  "design-substrate",
+  "research",
+  "scaffolding",
+  "CLAUDE.md",
+  "Project_Roadmap_v1.md",
+  "Phase_7_Session_1_Entry_Directive_v1.md",
+  "Phase_7_Workspace_Bootstrap_Runbook_v1.md",
+  "Phase_7_Workspace_Design_Substrate_Manifest_v1.md",
+  "Phase_7a_Substitution_Scaffolding.md",
+  "Sub_Agent_Boundary_Specification_v1.md",
+  "harness.toml",
+  ".env",
+  "dist",
+  "build",
+]

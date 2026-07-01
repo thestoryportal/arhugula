@@ -1,0 +1,46 @@
+# R-421 MANAGED_CLOUD runtime template for the E2B + GCP candidate.
+#
+# Replace `/absolute/path/to/arhugula-v2`, `your-gcp-project-id-or-number`,
+# and the OTLP endpoint with real managed-cloud values before running
+# readiness. Use the canonical Google Cloud project ID or numeric project
+# number, not the display name shown in the console (for example, not
+# "My First Project"). Static readiness does not fetch secrets, create an E2B
+# sandbox, or probe OTLP.
+
+[runtime]
+deployment_surface = "managed-cloud"
+repository_root = "/absolute/path/to/arhugula-v2"
+default_topology = "single-threaded-linear"
+
+anthropic_optional = true
+openai_optional = true
+ollama_optional = true
+
+[runtime.provider_secrets]
+backend = "gcp-secret-manager"
+gcp_project_id = "your-gcp-project-id-or-number"
+gcp_secret_version = "latest"
+keyring_service = "harness"
+
+[[runtime.provider_secrets.operator_allowlist]]
+name = "e2b-secret"
+scope = { name = "r421-managed-cloud" }
+
+[runtime.otel]
+# Runtime uses the OTLP gRPC exporter. For the Cloud Run collector path, use
+# the Cloud Run service URL only, without a /v1/traces suffix.
+otlp_endpoint = "https://collector.vendor.example"
+
+[runtime.collector]
+placement = "VENDOR_PIPELINE"
+# The R-421 E2B path represents a managed-cloud FULL_VM bootstrap/runtime
+# rather than a local host-process bootstrap. Keep Tier-1 strict; bind this
+# template to the network-capable C-OD-20 tier that can reach a vendor pipeline.
+bootstrap_sandbox_tier = "tier-4-full-vm"
+
+[runtime.routing_manifest]
+manifest_version = 1
+per_role_bindings = {}
+per_workload_overrides = {}
+retry_policies = {}
+fallback_chains = []

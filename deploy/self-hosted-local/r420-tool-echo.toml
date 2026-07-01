@@ -1,0 +1,26 @@
+# R-420 live daemon e2e workflow.
+#
+# Tool-only by design: local Ollama satisfies provider-bootstrap coverage, but
+# this workflow does not invoke an LLM provider or spend hosted-provider credits.
+
+version = 1
+
+[workflow]
+workflow_id = "r420-self-hosted-tool-echo"
+workload_class = "pipeline-automation"
+persona_tier = "solo-developer"
+engine_class = "pure-pattern-no-engine"
+topology_pattern = "single-threaded-linear"
+layer_budgets = []
+hitl_placements = []
+per_step_overrides = {}
+fallback_chain = { primary = { provider = "ollama", model = "llama3.2:3b", family = "local_open_weight" }, same_family = [], cross_family = [] }
+
+[default_model_binding]
+provider = "ollama"
+model = "llama3.2:3b"
+
+[[steps]]
+step_id = "echo"
+step_kind = "tool-step"
+step_payload = { tool_id = "echo", tool_args = { value = "r420-self-hosted-ok" } }

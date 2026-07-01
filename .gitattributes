@@ -1,0 +1,12 @@
+# .gitattributes — H_T workspace. Authority: Bootstrap Runbook §4.4.5.
+# Force LF line endings. Rationale: hash-chain integrity per IS plan v2.2
+# U-IS-08/09/10 requires deterministic byte-level state ledger writes;
+# CRLF vs LF differences break SHA-256 chain verification.
+
+*.py    text eol=lf
+*.jsonl text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.toml  text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf

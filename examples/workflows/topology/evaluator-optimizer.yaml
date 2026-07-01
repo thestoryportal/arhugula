@@ -1,0 +1,74 @@
+version: 1
+# Topology fixture — evaluator-optimizer.
+#
+# Demonstrates the evaluator-optimizer topology pattern passing the runtime
+# sub-agent-dispatch admissibility gate (C-CP-11 §11.1 PER_WORKLOAD_CLASS_TOPOLOGY
+# ∪ C-CP-10 §10.3 cross-pattern; enforced at sub_agent_dispatch.py
+# is_topology_permitted). The child sub-agent declares topology_pattern
+# "evaluator-optimizer" paired with the admissible workload "content-creation".
+#
+# MVP-scope honesty (per probe finding + runtime spec v1.6 §14.7.2 step 5):
+# topology_pattern has NO distinct per-pattern orchestration at runtime today —
+# dispatch is a stateless passthrough that validates admissibility and emits a
+# topology.pattern span attribute. Evaluator-optimizer would loop a generator against an evaluator.
+# This fixture exercises the admissibility + dispatch-composer + telemetry
+# surface, NOT distinct orchestration semantics (unbuilt; CP-axis contract work).
+workflow:
+  workflow_id: "topology-evaluator-optimizer"
+  workload_class: "pipeline-automation"
+  persona_tier: "solo-developer"
+  engine_class: "pure-pattern-no-engine"
+  topology_pattern: "single-threaded-linear"
+  layer_budgets: []
+  fallback_chain:
+    primary:
+      provider: "anthropic"
+      model: "claude-haiku-4-5"
+      family: "anthropic"
+    same_family: []
+    cross_family: []
+  hitl_placements: []
+  per_step_overrides: {}
+default_model_binding:
+  provider: "anthropic"
+  model: "claude-haiku-4-5"
+steps:
+  - step_id: "dispatch-evaluator-optimizer"
+    step_kind: "sub-agent-dispatch"
+    step_payload:
+      child_workflow_id: "child-evaluator-optimizer"
+      child_manifest_entry:
+        workflow_id: "child-evaluator-optimizer"
+        workload_class: "content-creation"
+        persona_tier: "solo-developer"
+        engine_class: "pure-pattern-no-engine"
+        topology_pattern: "evaluator-optimizer"
+        layer_budgets: []
+        fallback_chain:
+          primary:
+            provider: "anthropic"
+            model: "claude-haiku-4-5"
+            family: "anthropic"
+          same_family: []
+          cross_family: []
+        hitl_placements: []
+        per_step_overrides: {}
+      child_steps:
+        - step_id: "child-step-0"
+          step_kind: "inference-step"
+          step_payload:
+            max_tokens: 8
+      brief:
+        objective: "demonstrate evaluator-optimizer topology admissibility"
+        output_format:
+          schema_kind: "json_schema"
+          schema_body: '{"type":"object"}'
+        guidance: "deterministic fixture; child runner is a stand-in per spec 14.7"
+        task_boundaries:
+          in_scope:
+            - "topology admissibility demonstration"
+          out_of_scope:
+            - "real sub-agent orchestration"
+          termination_criteria:
+            - "child dispatch returns"
+        summary_hash: "0000000000000000000000000000000000000000000000000000000000000000"

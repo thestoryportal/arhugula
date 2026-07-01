@@ -1,0 +1,36 @@
+version: 1
+# Per probe finding #5 + #6 + PR #79 Q2=α + PR #80 Q2=α: at MVP scope only
+# SINGLE_THREADED_LINEAR topology is materialized; per matrix at C-CP-22
+# §11.1, only PIPELINE_AUTOMATION admits SINGLE_THREADED_LINEAR. Post-spec
+# v1.38 Reading A: PR #80 deferred load-time topology admissibility to the
+# runtime sub-agent-dispatch site, so the matrix mismatch no longer
+# blocks at load; this fixture still uses the MVP-runnable combo so the
+# probe end-to-end happy path holds. Switch to software-engineering once
+# evaluator-optimizer materializes at C-CP-25 v1.7+.
+workflow:
+  workflow_id: "track-b-minimal"
+  workload_class: "pipeline-automation"
+  persona_tier: "solo-developer"
+  engine_class: "pure-pattern-no-engine"
+  topology_pattern: "single-threaded-linear"
+  layer_budgets: []
+  fallback_chain:
+    primary:
+      provider: "anthropic"
+      model: "claude-haiku-4-5"
+      family: "anthropic"
+    same_family: []
+    cross_family: []
+  hitl_placements: []
+  per_step_overrides: {}
+default_model_binding:
+  provider: "anthropic"
+  model: "claude-haiku-4-5"
+steps:
+  - step_id: "s1"
+    step_kind: "inference-step"
+    # Native int scalar per spec v1.39 §14.19 Reading A (pyyaml SafeLoader
+    # subclass preserves YAML 1.1 scalar types). Pre-v1.39 strictyaml
+    # stringified this → Anthropic SDK rejected.
+    step_payload:
+      max_tokens: 8

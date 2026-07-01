@@ -1,0 +1,26 @@
+# Sibling of minimal.yaml — both fixtures aligned at PR #79 + #80 Q2=α
+# (pipeline-automation + single-threaded-linear; MVP-runnable per probe).
+# step_payload carries native int max_tokens; spec v1.39 §14.19 Reading A
+# pyyaml StrictSafeLoader preserves typing parity with tomllib at YAML side.
+
+version = 1
+
+[workflow]
+workflow_id = "track-b-minimal"
+workload_class = "pipeline-automation"
+persona_tier = "solo-developer"
+engine_class = "pure-pattern-no-engine"
+topology_pattern = "single-threaded-linear"
+layer_budgets = []
+hitl_placements = []
+per_step_overrides = {}
+fallback_chain = { primary = { provider = "anthropic", model = "claude-haiku-4-5", family = "anthropic" }, same_family = [], cross_family = [] }
+
+[default_model_binding]
+provider = "anthropic"
+model = "claude-haiku-4-5"
+
+[[steps]]
+step_id = "s1"
+step_kind = "inference-step"
+step_payload = { max_tokens = 8 }
