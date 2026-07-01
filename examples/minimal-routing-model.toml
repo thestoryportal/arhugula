@@ -1,0 +1,49 @@
+# examples/minimal-routing-model.toml — minimal workflow with a model-only routing change.
+#
+# Run it with:
+#
+#     just run examples/minimal-routing-model.toml
+#
+# (See examples/README.md for the one-time setup: harness.toml + .env.)
+#
+# Shape notes:
+#   * workload_class = "pipeline-automation" + topology_pattern =
+#     "single-threaded-linear" are the only (workload, topology) pair the v1
+#     MVP materializes end-to-end. (software-engineering / evaluator-optimizer
+#     are declared in the spec but not yet runnable — see PR #80 lineage.)
+#   * engine_class = "pure-pattern-no-engine" runs the step inline with no
+#     durable-execution engine (MVP default).
+#   * The manifest is TOML (not YAML): tomllib preserves native scalar types,
+#     so `max_tokens = 8` reaches the LLM SDK as an int. The YAML loader path
+#     is still gated on the strictyaml scalar-coercion Class 1 fork.
+
+version = 1
+
+[workflow]
+workflow_id = "example-minimal-routing-model"
+workload_class = "pipeline-automation"
+persona_tier = "solo-developer"
+engine_class = "pure-pattern-no-engine"
+topology_pattern = "single-threaded-linear"
+layer_budgets = []
+hitl_placements = []
+per_step_overrides = {}
+fallback_chain = { primary = { provider = "anthropic", model = "claude-sonnet-4-6", family = "anthropic" }, same_family = [], cross_family = [] }
+
+[default_model_binding]
+provider = "anthropic"
+model = "claude-sonnet-4-6"
+
+# A single INFERENCE_STEP. step_payload is opaque to the loader and
+# interpreted by the LLM dispatcher as a provider-agnostic
+# {messages, tools, params} payload (llm_dispatch.py _coerce_payload).
+# `params.max_tokens` is required by the Anthropic messages.create call;
+# a single-token reply keeps the smoke cheap.
+[[steps]]
+step_id = "s1"
+step_kind = "inference-step"
+
+[steps.step_payload]
+messages = [{ role = "user", content = "Reply with the single word: ok" }]
+tools = []
+params = { max_tokens = 8 }
