@@ -1,0 +1,27 @@
+# Paired runtime overlay for examples/recovery-ollama-fallback.toml.
+#
+# This is a set of RuntimeConfig edits, not a complete config file to append.
+# Start from harness.toml.example, set your local paths in harness.toml, then
+# apply these runtime values to a temp copy of harness.toml for the proof run.
+#
+# The workflow manifest records the same fallback intent, but the current
+# one-shot runtime dispatch path uses [runtime.routing_manifest].fallback_chains[0]
+# as the effective model-control surface.
+
+[runtime]
+anthropic_optional = true
+openai_optional = true
+ollama_optional = false
+ollama_host = "http://127.0.0.1:11434"
+
+[runtime.otel]
+otlp_endpoint = "http://127.0.0.1:4317"
+
+[runtime.routing_manifest]
+manifest_version = 1
+per_role_bindings = {}
+per_workload_overrides = {}
+retry_policies = {}
+fallback_chains = [
+    { primary = { provider = "ollama", model = "llama-nonexistent-model-r300-fallback-probe", family = "local_open_weight" }, same_family = [{ provider = "ollama", model = "llama3.2:3b", family = "local_open_weight" }], cross_family = [] },
+]

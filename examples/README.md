@@ -71,6 +71,28 @@ just run examples/minimal-routing-model.toml
 
 The expected LLM span is `chat claude-sonnet-4-6`.
 
+## Run the Ollama recovery pair
+
+`recovery-ollama-fallback.toml` pairs with
+`recovery-ollama-fallback.runtime-overlay.toml.example`. This is a recovery
+example, not a beginner happy-path smoke: the primary model is intentionally
+unavailable, the reserved `llm_dispatch` retry policy exhausts it, and the
+runtime fallback chain recovers to local `llama3.2:3b`.
+
+Use it after `llama3.2:3b` is pulled locally and Ollama is listening on
+`127.0.0.1:11434`. Apply the runtime overlay to a temp copy of `harness.toml`,
+then run with hosted credentials disabled:
+
+```sh
+env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY \
+  PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring \
+  uv run harness run examples/recovery-ollama-fallback.toml --config <temp-config>
+```
+
+With the self-hosted observability stack running, the expected trace contains
+failed `chat llama-nonexistent-model-r300-fallback-probe` spans followed by a
+successful `chat llama3.2:3b` span, all with `gen_ai.provider.name = "ollama"`.
+
 ## Notes
 
 - **TOML, not YAML.** `tomllib` preserves native scalar types, so

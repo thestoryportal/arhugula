@@ -1,0 +1,49 @@
+# examples/recovery-ollama-fallback.toml — local Ollama recovery/fallback example.
+#
+# This is not the first beginner smoke path: it intentionally dispatches an
+# unavailable local Ollama model first, then recovers to llama3.2:3b through the
+# runtime fallback chain. It is useful after the minimal smoke and Sonnet routing
+# pair because it proves recovery behavior, not only happy-path dispatch.
+#
+# Requirements:
+#   * Ollama running at http://127.0.0.1:11434
+#   * llama3.2:3b pulled locally
+#   * A temp harness config with
+#     examples/recovery-ollama-fallback.runtime-overlay.toml.example applied
+#   * Hosted credentials disabled for the run if you want a zero-hosted-provider
+#     proof:
+#       env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY \
+#         PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring \
+#         uv run harness run examples/recovery-ollama-fallback.toml --config <temp-config>
+#
+# The invalid primary is retried by the reserved llm_dispatch retry policy
+# before the same-family fallback is attempted, so this can take longer than the
+# happy-path smoke.
+
+version = 1
+
+[workflow]
+workflow_id = "example-recovery-ollama-fallback"
+workload_class = "pipeline-automation"
+persona_tier = "solo-developer"
+engine_class = "pure-pattern-no-engine"
+topology_pattern = "single-threaded-linear"
+layer_budgets = []
+hitl_placements = []
+per_step_overrides = {}
+fallback_chain = { primary = { provider = "ollama", model = "llama-nonexistent-model-r300-fallback-probe", family = "local_open_weight" }, same_family = [{ provider = "ollama", model = "llama3.2:3b", family = "local_open_weight" }], cross_family = [] }
+
+[default_model_binding]
+provider = "ollama"
+model = "llama-nonexistent-model-r300-fallback-probe"
+
+# A single INFERENCE_STEP. Ollama expects its generation limit in
+# params.options.num_predict rather than Anthropic/OpenAI's params.max_tokens.
+[[steps]]
+step_id = "s1"
+step_kind = "inference-step"
+
+[steps.step_payload]
+messages = [{ role = "user", content = "Reply with the single word: ok" }]
+tools = []
+params = { options = { num_predict = 4 } }
