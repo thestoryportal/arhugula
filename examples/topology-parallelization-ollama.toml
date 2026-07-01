@@ -1,0 +1,51 @@
+# examples/topology-parallelization-ollama.toml - local Ollama parallelization example.
+#
+# This example proves fan-out topology behavior, not only single-step dispatch.
+# It pairs with topology-parallelization-ollama.runtime-overlay.toml.example
+# because workload_class = "research" requires matching runtime path bindings,
+# and the current one-shot path dispatches through the runtime routing manifest.
+#
+# Requirements:
+#   * Ollama running at http://127.0.0.1:11434
+#   * llama3.2:3b pulled locally
+#   * The self-hosted observability stack running if you want Tempo proof
+#   * A temp harness config with the paired runtime overlay applied
+#   * Hosted credentials disabled for a zero-hosted-provider proof:
+#       env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY \
+#         PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring \
+#         uv run harness run examples/topology-parallelization-ollama.toml --config <temp-config>
+
+version = 1
+
+[workflow]
+workflow_id = "example-topology-parallelization-ollama"
+workload_class = "research"
+persona_tier = "solo-developer"
+engine_class = "pure-pattern-no-engine"
+topology_pattern = "parallelization"
+layer_budgets = []
+hitl_placements = []
+per_step_overrides = {}
+fallback_chain = { primary = { provider = "ollama", model = "llama3.2:3b", family = "local_open_weight" }, same_family = [], cross_family = [] }
+
+[default_model_binding]
+provider = "ollama"
+model = "llama3.2:3b"
+
+[[steps]]
+step_id = "branch-a"
+step_kind = "inference-step"
+
+[steps.step_payload]
+messages = [{ role = "user", content = "Reply with exactly one letter: A" }]
+tools = []
+params = { options = { temperature = 0, num_predict = 1 } }
+
+[[steps]]
+step_id = "branch-b"
+step_kind = "inference-step"
+
+[steps.step_payload]
+messages = [{ role = "user", content = "Reply with exactly one letter: B" }]
+tools = []
+params = { options = { temperature = 0, num_predict = 1 } }

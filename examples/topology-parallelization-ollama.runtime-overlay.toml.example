@@ -1,0 +1,55 @@
+# Paired runtime overlay for examples/topology-parallelization-ollama.toml.
+#
+# This is a set of RuntimeConfig edits, not a complete config file to append.
+# Start from harness.toml.example, set your local paths in harness.toml, then
+# apply these runtime values to a temp copy of harness.toml for the proof run.
+#
+# Replace /absolute/path/to/arhugula with this checkout's absolute path. The
+# research path bindings are required because the paired workflow declares
+# workload_class = "research".
+#
+# The workflow manifest records the same Ollama intent, but the current
+# one-shot runtime dispatch path uses [runtime.routing_manifest].fallback_chains[0]
+# as the effective model-control surface.
+
+[runtime]
+anthropic_optional = true
+openai_optional = true
+ollama_optional = false
+ollama_host = "http://127.0.0.1:11434"
+
+[runtime.otel]
+otlp_endpoint = "http://127.0.0.1:4317"
+
+[[runtime.path_bindings.raw_entries]]
+path_class = "SKILLS"
+workflow_class = "research"
+deployment_surface = "local-development"
+path = "/absolute/path/to/arhugula/skills"
+
+[[runtime.path_bindings.raw_entries]]
+path_class = "PROMPTS"
+workflow_class = "research"
+deployment_surface = "local-development"
+path = "/absolute/path/to/arhugula/prompts"
+
+[[runtime.path_bindings.raw_entries]]
+path_class = "ROUTING_MANIFEST"
+workflow_class = "research"
+deployment_surface = "local-development"
+path = "/absolute/path/to/arhugula/routing_manifest"
+
+[[runtime.path_bindings.raw_entries]]
+path_class = "STATE_LEDGER"
+workflow_class = "research"
+deployment_surface = "local-development"
+path = "/absolute/path/to/arhugula/.harness/state.jsonl"
+
+[runtime.routing_manifest]
+manifest_version = 1
+per_role_bindings = {}
+per_workload_overrides = {}
+retry_policies = {}
+fallback_chains = [
+    { primary = { provider = "ollama", model = "llama3.2:3b", family = "local_open_weight" }, same_family = [], cross_family = [] },
+]
