@@ -59,6 +59,7 @@ __all__ = [
 #: `LOCAL_OPEN_WEIGHT`.
 _PROVIDER_FAMILY_BY_PROVIDER: dict[str, ProviderFamily] = {
     "anthropic": ProviderFamily.ANTHROPIC,
+    "claude_code": ProviderFamily.ANTHROPIC,
     "openai": ProviderFamily.OPENAI,
     "google": ProviderFamily.GOOGLE,
     "gemini": ProviderFamily.GOOGLE,

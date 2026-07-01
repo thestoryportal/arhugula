@@ -61,6 +61,7 @@ from harness_runtime.lifecycle.providers import (
 )
 from harness_runtime.types import (
     CollectorConfig,
+    ExternalCLIProviderConfig,
     OTelConfig,
     PathBindingConfig,
     ProviderClient,
@@ -581,6 +582,8 @@ def _runtime_config_with_ollama(
     ollama_optional: bool = False,
     anthropic_optional: bool = False,
     openai_optional: bool = False,
+    enabled_provider_names: tuple[str, ...] = ("anthropic", "openai", "ollama"),
+    external_cli_providers: tuple[ExternalCLIProviderConfig, ...] = (),
 ) -> RuntimeConfig:
     """`RuntimeConfig` with explicit Ollama config — for U-RT-19 tests."""
     return RuntimeConfig(
@@ -595,6 +598,8 @@ def _runtime_config_with_ollama(
         ollama_optional=ollama_optional,
         anthropic_optional=anthropic_optional,
         openai_optional=openai_optional,
+        enabled_provider_names=enabled_provider_names,
+        external_cli_providers=external_cli_providers,
     )
 
 
@@ -758,6 +763,60 @@ async def test_materialize_stage_three_providers_happy_path(
     assert set(stage.providers.keys()) == {"anthropic", "openai", "ollama"}
     for key in ("anthropic", "openai", "ollama"):
         assert isinstance(stage.providers[key], ProviderClient)
+
+
+@pytest.mark.asyncio
+async def test_materialize_stage_respects_enabled_provider_names_for_external_cli(
+    fake_keyring: _FakeKeyring, tmp_path: Path
+) -> None:
+    """CLI-only config constructs only the named external provider."""
+    resolver = make_keyring_resolver(ProviderSecretsConfig())
+    cli_config = ExternalCLIProviderConfig(
+        provider="claude_code",
+        kind="claude-code",
+        command="claude",
+    )
+    config = _runtime_config_with_ollama(
+        tmp_path,
+        enabled_provider_names=("claude_code",),
+        external_cli_providers=(cli_config,),
+    )
+    external_seen: list[str] = []
+
+    async def external_c(provider_config: ExternalCLIProviderConfig) -> ProviderClient:
+        external_seen.append(provider_config.provider)
+        return _ready_adapter(provider_config.provider)
+
+    async def disabled_builtin() -> ProviderClient:
+        raise AssertionError("disabled built-in provider should not construct")
+
+    stage = await materialize_provider_clients_stage(
+        config,
+        resolver,
+        anthropic_construct=disabled_builtin,
+        openai_construct=disabled_builtin,
+        ollama_construct=disabled_builtin,
+        external_cli_construct=external_c,
+    )
+
+    assert external_seen == ["claude_code"]
+    assert set(stage.providers) == {"claude_code"}
+
+
+@pytest.mark.asyncio
+async def test_materialize_stage_errors_when_enabled_external_provider_missing_config(
+    fake_keyring: _FakeKeyring, tmp_path: Path
+) -> None:
+    """An enabled external provider must have a matching config entry."""
+    resolver = make_keyring_resolver(ProviderSecretsConfig())
+    config = _runtime_config_with_ollama(
+        tmp_path,
+        enabled_provider_names=("claude_code",),
+        external_cli_providers=(),
+    )
+
+    with pytest.raises(ProviderNoneConfiguredError, match="claude_code"):
+        await materialize_provider_clients_stage(config, resolver)
 
 
 @pytest.mark.asyncio

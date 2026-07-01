@@ -20,6 +20,7 @@ from harness_runtime.config.loader import (
 )
 from harness_runtime.types import (
     CollectorConfig,
+    ExternalCLIProviderConfig,
     OTelConfig,
     PathBindingConfig,
     ProviderSecretsConfig,
@@ -49,6 +50,33 @@ def test_kwargs_only_materializes() -> None:
     cfg = materialize_runtime_config(env={}, **_required_kwargs())
     direct = RuntimeConfig(**_required_kwargs())
     assert cfg == direct
+
+
+def test_enabled_provider_names_defaults_to_existing_three_providers() -> None:
+    """R-CLI-1 keeps current bootstrap behavior unless operators opt in."""
+    cfg = materialize_runtime_config(env={}, **_required_kwargs())
+    assert cfg.enabled_provider_names == ("anthropic", "openai", "ollama")
+    assert cfg.external_cli_providers == ()
+
+
+def test_external_cli_provider_config_materializes_from_kwargs() -> None:
+    """Operators can opt into a local authenticated CLI provider without secrets."""
+    cfg = materialize_runtime_config(
+        env={},
+        **_required_kwargs(),
+        enabled_provider_names=("claude_code",),
+        external_cli_providers=(
+            ExternalCLIProviderConfig(
+                provider="claude_code",
+                kind="claude-code",
+                command="claude",
+                timeout_seconds=90.0,
+            ),
+        ),
+    )
+    assert cfg.enabled_provider_names == ("claude_code",)
+    assert cfg.external_cli_providers[0].provider == "claude_code"
+    assert cfg.external_cli_providers[0].command == "claude"
 
 
 def test_env_supplies_scalar_fields_when_kwargs_omit_them() -> None:

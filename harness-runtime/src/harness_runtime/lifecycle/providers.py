@@ -69,7 +69,14 @@ from harness_runtime.config.provider_secrets import (
     ProviderSecretResolver,
     SecretResolutionError,
 )
-from harness_runtime.types import ProviderClient, RuntimeConfig
+from harness_runtime.lifecycle.external_cli_provider import (
+    ExternalCLICommandError,
+    ExternalCLINotAuthenticatedError,
+    ExternalCLIOutputError,
+    ExternalCLIProcessTimeout,
+    construct_external_cli_adapter,
+)
+from harness_runtime.types import ExternalCLIProviderConfig, ProviderClient, RuntimeConfig
 
 __all__ = [
     "ANTHROPIC_KEYRING_NAME",
@@ -176,11 +183,18 @@ class ProviderNoneConfiguredError(Exception):
     operator-ratified 2026-05-28 (E-prod-3).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, reason: str | None = None) -> None:
+        detail = (
+            reason
+            if reason is not None
+            else (
+                "all providers failed to construct AND were marked optional; "
+                "no provider remains. Configure at least one provider keyring "
+                "entry, OR mark fewer providers optional."
+            )
+        )
         super().__init__(
-            "stage 3a CP_CLIENTS: all providers failed to construct AND were "
-            "marked optional; no provider remains. Configure at least one "
-            "provider keyring entry, OR mark fewer providers optional."
+            f"stage 3a CP_CLIENTS: {detail}"
         )
 
 
@@ -634,6 +648,8 @@ async def materialize_provider_clients_stage(
     anthropic_construct: Callable[[], Awaitable[ProviderClient]] | None = None,
     openai_construct: Callable[[], Awaitable[ProviderClient]] | None = None,
     ollama_construct: Callable[[], Awaitable[ProviderClient]] | None = None,
+    external_cli_construct: Callable[[ExternalCLIProviderConfig], Awaitable[ProviderClient]]
+    | None = None,
     max_attempts: int = DEFAULT_STAGE_3A_MAX_ATTEMPTS,
 ) -> ProviderClientsStage:
     """Build the stage 3a CP_CLIENTS provider dict per C-RT-02 invariants.
@@ -695,64 +711,125 @@ async def materialize_provider_clients_stage(
 
         ollama_construct = ollama_construct_default
 
+    if external_cli_construct is None:
+
+        async def external_cli_construct_default(
+            provider_config: ExternalCLIProviderConfig,
+        ) -> ProviderClient:
+            try:
+                return await construct_external_cli_adapter(provider_config)
+            except ExternalCLINotAuthenticatedError as exc:
+                raise ProviderAuthError(provider_config.provider, exc) from exc
+            except (
+                ExternalCLICommandError,
+                ExternalCLIOutputError,
+                ExternalCLIProcessTimeout,
+            ) as exc:
+                raise ProviderTransientError(provider_config.provider, exc) from exc
+
+        external_cli_construct = external_cli_construct_default
+
     providers: dict[str, ProviderClient] = {}
+    enabled_names = tuple(dict.fromkeys(config.enabled_provider_names))
+    if not enabled_names:
+        raise ProviderNoneConfiguredError("enabled_provider_names is empty")
+    enabled = frozenset(enabled_names)
+    builtin_names = frozenset(("anthropic", "openai", "ollama"))
+    external_configs = {item.provider: item for item in config.external_cli_providers}
+    missing_external = [
+        name for name in enabled_names if name not in builtin_names and name not in external_configs
+    ]
+    if missing_external:
+        raise ProviderNoneConfiguredError(
+            "enabled external provider(s) missing config: " + ", ".join(missing_external)
+        )
 
     # Step 1: Anthropic. ProviderAuthError ALWAYS propagates (operator
     # misconfig). ProviderTransientError + ProviderSecretMissingError swallow
     # only if `anthropic_optional=True` per
     # `.harness/class_1_fork_provider_construction_allowlist_semantic.md`
     # (E-prod-3, 2026-05-28).
-    try:
-        providers["anthropic"] = await _attempt_with_bounded_retry(
-            "anthropic", anthropic_construct, max_attempts=max_attempts
-        )
-    except (ProviderTransientError, ProviderSecretMissingError) as exc:
-        if config.anthropic_optional:
-            cause = exc.cause if isinstance(exc, ProviderTransientError) else exc
-            warnings.warn(
-                ProviderDegradedWarning("anthropic", cause),
-                stacklevel=2,
+    if "anthropic" in enabled:
+        try:
+            providers["anthropic"] = await _attempt_with_bounded_retry(
+                "anthropic", anthropic_construct, max_attempts=max_attempts
             )
-            # `"anthropic"` key intentionally absent from providers dict.
-        else:
-            raise
+        except (ProviderTransientError, ProviderSecretMissingError) as exc:
+            if config.anthropic_optional:
+                cause = exc.cause if isinstance(exc, ProviderTransientError) else exc
+                warnings.warn(
+                    ProviderDegradedWarning("anthropic", cause),
+                    stacklevel=2,
+                )
+                # `"anthropic"` key intentionally absent from providers dict.
+            else:
+                raise
 
     # Step 2: OpenAI. Symmetric to anthropic.
-    try:
-        providers["openai"] = await _attempt_with_bounded_retry(
-            "openai", openai_construct, max_attempts=max_attempts
-        )
-    except (ProviderTransientError, ProviderSecretMissingError) as exc:
-        if config.openai_optional:
-            cause = exc.cause if isinstance(exc, ProviderTransientError) else exc
-            warnings.warn(
-                ProviderDegradedWarning("openai", cause),
-                stacklevel=2,
+    if "openai" in enabled:
+        try:
+            providers["openai"] = await _attempt_with_bounded_retry(
+                "openai", openai_construct, max_attempts=max_attempts
             )
-        else:
-            raise
+        except (ProviderTransientError, ProviderSecretMissingError) as exc:
+            if config.openai_optional:
+                cause = exc.cause if isinstance(exc, ProviderTransientError) else exc
+                warnings.warn(
+                    ProviderDegradedWarning("openai", cause),
+                    stacklevel=2,
+                )
+            else:
+                raise
 
     # Step 3: Ollama. Keyring-less (local-tier); only ProviderTransientError
     # is possible at construction (no SecretMissingError path). Matches the
     # pre-E-prod-3 ollama_optional behavior.
-    try:
-        providers["ollama"] = await _attempt_with_bounded_retry(
-            "ollama", ollama_construct, max_attempts=max_attempts
-        )
-    except ProviderTransientError as transient_exc:
-        if config.ollama_optional:
-            # Surface degraded; continue with reduced-provider context.
-            # Unwrap to `transient_exc.cause` (e.g., ConnectionError) so the
-            # warning identifies the underlying network failure, not the
-            # ProviderTransientError wrapper that's an internal carry.
-            warnings.warn(
-                ProviderDegradedWarning("ollama", transient_exc.cause),
-                stacklevel=2,
+    if "ollama" in enabled:
+        try:
+            providers["ollama"] = await _attempt_with_bounded_retry(
+                "ollama", ollama_construct, max_attempts=max_attempts
             )
-            # `"ollama"` key intentionally absent from providers dict.
-        else:
-            # Hard stage-3a failure per multi-LLM commitment.
-            raise
+        except ProviderTransientError as transient_exc:
+            if config.ollama_optional:
+                # Surface degraded; continue with reduced-provider context.
+                # Unwrap to `transient_exc.cause` (e.g., ConnectionError) so the
+                # warning identifies the underlying network failure, not the
+                # ProviderTransientError wrapper that's an internal carry.
+                warnings.warn(
+                    ProviderDegradedWarning("ollama", transient_exc.cause),
+                    stacklevel=2,
+                )
+                # `"ollama"` key intentionally absent from providers dict.
+            else:
+                # Hard stage-3a failure per multi-LLM commitment.
+                raise
+
+    # Step 4: configured external CLI providers. Unknown enabled names already
+    # failed above; this loop preserves the operator's enabled-provider order.
+    for provider_name in enabled_names:
+        if provider_name in builtin_names:
+            continue
+        provider_config = external_configs[provider_name]
+
+        async def construct_external(
+            provider_config: ExternalCLIProviderConfig = provider_config,
+        ) -> ProviderClient:
+            return await external_cli_construct(provider_config)
+
+        try:
+            providers[provider_name] = await _attempt_with_bounded_retry(
+                provider_name,
+                construct_external,
+                max_attempts=max_attempts,
+            )
+        except ProviderTransientError as transient_exc:
+            if provider_config.optional:
+                warnings.warn(
+                    ProviderDegradedWarning(provider_name, transient_exc.cause),
+                    stacklevel=2,
+                )
+            else:
+                raise
 
     # Post-loop invariant: at least one provider successfully constructed.
     # If every provider was optional + degraded, surface the typed

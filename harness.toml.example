@@ -61,6 +61,24 @@ ollama_optional = true
 # `http://localhost:11434`.
 # ollama_host = "http://localhost:11434"
 
+# Optional. Provider construction allowlist. Defaults to all built-in
+# providers: ["anthropic", "openai", "ollama"]. To route through an
+# already-authenticated local CLI only, set this to the external provider
+# key and add a matching `runtime.external_cli_providers` table below.
+# enabled_provider_names = ["claude_code"]
+
+# Optional. Subscription-backed local CLI provider config. This table carries
+# executable metadata only. Do not put OAuth/session tokens or hosted API keys
+# here; authenticate the official CLI itself and let it own its local session.
+#
+# [[runtime.external_cli_providers]]
+# provider = "claude_code"
+# kind = "claude-code"
+# command = "claude"
+# timeout_seconds = 120
+# auth_check = true
+# optional = false
+
 
 # Provider secret backend selection. This table carries selector metadata
 # only. Do not put API keys, tokens, passwords, or other secret values here.

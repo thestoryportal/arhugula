@@ -74,6 +74,31 @@ uv run harness run examples/minimal-routing-model.toml --config "$SONNET_CONFIG"
 
 The expected LLM span is `chat claude-sonnet-4-6`.
 
+## Route through local Claude Code
+
+`claude-code.runtime-overlay.toml.example` routes `examples/minimal.toml`
+through an already-authenticated local Claude Code CLI. Arhugula does not read
+or store Claude OAuth/session tokens; it only runs the official `claude` CLI
+with stdin/stdout.
+
+First verify local CLI auth:
+
+```sh
+claude auth status --json
+```
+
+Only run the live example if that reports `"loggedIn": true`. Materialize the
+overlay, then run the existing minimal workflow:
+
+```sh
+CLAUDE_CODE_CONFIG="$(just example-config examples/claude-code.runtime-overlay.toml.example)"
+uv run harness run examples/minimal.toml --config "$CLAUDE_CODE_CONFIG"
+```
+
+The expected LLM span is `chat sonnet` with
+`gen_ai.provider.name = "claude_code"` and
+`external_cli.provider.kind = "claude-code"`.
+
 ## Set up local Ollama
 
 The Ollama examples require Ollama listening on `127.0.0.1:11434` with

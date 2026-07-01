@@ -193,6 +193,8 @@ __all__ = [
     "ContentAddressedIndex",
     "CostAttributionChain",
     "EngineSelector",
+    "ExternalCLIProviderConfig",
+    "ExternalCLIProviderKind",
     "HITLPlacementRegistry",
     "HandoffRegistry",
     "HarnessContext",
@@ -1244,6 +1246,55 @@ class ProviderClient(Protocol):
         ...
 
 
+class ExternalCLIProviderKind(StrEnum):
+    """Supported subscription-backed local CLI provider adapters."""
+
+    CLAUDE_CODE = "claude-code"
+
+
+class ExternalCLIProviderConfig(BaseModel):
+    """Config for an already-authenticated local CLI-backed provider.
+
+    Carries executable metadata only. OAuth/session material stays exclusively
+    inside the official local CLI's own auth/session store.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    provider: str
+    """Provider key used by routing, for example ``"claude_code"``."""
+
+    kind: ExternalCLIProviderKind
+    """Adapter implementation kind. R-CLI-1 v1 supports ``"claude-code"``."""
+
+    command: str = "claude"
+    """Executable name/path passed as argv[0] to create_subprocess_exec."""
+
+    timeout_seconds: float = 120.0
+    """Per-process timeout for auth checks and inference calls."""
+
+    auth_check: bool = True
+    """If true, construction probes official CLI auth status before routing."""
+
+    optional: bool = False
+    """If true, construction failure degrades like the built-in optional providers."""
+
+    @field_validator("provider", "command")
+    @classmethod
+    def _non_empty_string(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must be a non-empty string")
+        return stripped
+
+    @field_validator("timeout_seconds")
+    @classmethod
+    def _positive_timeout(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError("timeout_seconds must be > 0")
+        return value
+
+
 # ----------------------------------------------------------------------------
 # `RuntimeConfig` — C-RT-03 v1.1 schema.
 # ----------------------------------------------------------------------------
@@ -1345,6 +1396,17 @@ class RuntimeConfig(BaseModel):
     Added per `.harness/class_1_fork_provider_construction_allowlist_semantic.md`
     operator-ratified 2026-05-28 (E-prod-3). Symmetric extension of the
     `ollama_optional` precedent."""
+
+    enabled_provider_names: tuple[str, ...] = ("anthropic", "openai", "ollama")
+    """Provider keys stage 3a should construct.
+
+    Defaults to the existing three built-in providers for backwards-compatible
+    bootstrap behavior. Operators can opt into an external CLI provider by
+    naming its `ExternalCLIProviderConfig.provider` here.
+    """
+
+    external_cli_providers: tuple[ExternalCLIProviderConfig, ...] = ()
+    """Local CLI-backed provider configs. Contains no secret/token fields."""
 
     inter_step_data_flow: bool = False
     """B-INTERSTEP (R-FS-1 standalone arc; runtime spec §14.21 C-RT-34, new at

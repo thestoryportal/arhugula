@@ -316,6 +316,37 @@ def test_minimal_harness_toml_loads_with_sub_config_defaults(
     assert cfg.otel.otlp_endpoint == "http://localhost:4318"
 
 
+def test_external_cli_provider_config_loads_from_harness_toml(tmp_path: Path) -> None:
+    """R-CLI-1 TOML config carries provider identity and CLI metadata only."""
+    config_file = tmp_path / "harness.toml"
+    config_file.write_text(
+        "[runtime]\n"
+        'deployment_surface = "local-development"\n'
+        f'repository_root = "{tmp_path}"\n'
+        'default_topology = "single-threaded-linear"\n'
+        'enabled_provider_names = ["claude_code"]\n'
+        "\n"
+        "[runtime.otel]\n"
+        'otlp_endpoint = "http://localhost:4318"\n'
+        "\n"
+        "[[runtime.external_cli_providers]]\n"
+        'provider = "claude_code"\n'
+        'kind = "claude-code"\n'
+        'command = "claude"\n'
+        "timeout_seconds = 90\n",
+        encoding="utf-8",
+    )
+
+    cfg = RuntimeConfigSource.load(config_file=config_file)
+
+    assert cfg.enabled_provider_names == ("claude_code",)
+    assert len(cfg.external_cli_providers) == 1
+    provider = cfg.external_cli_providers[0]
+    assert provider.provider == "claude_code"
+    assert provider.command == "claude"
+    assert provider.timeout_seconds == 90.0
+
+
 # Per `[[finding-runtime-config-loader-unreachable-sub-configs]]` fix (B):
 # the SCHEMA FIELD NAME `provider_secrets` (a TOML sub-table name) MUST NOT
 # false-match the plaintext-secret detector. The leaf-vs-table discrimination

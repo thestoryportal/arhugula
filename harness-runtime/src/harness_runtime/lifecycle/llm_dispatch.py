@@ -227,6 +227,13 @@ class _ProvidersLike(Protocol):
 
 
 @runtime_checkable
+class _ExternalCLIProviderLike(Protocol):
+    """Provider shape for text-only local CLI adapters."""
+
+    async def dispatch_text(self, *, model: str, prompt: str) -> Any: ...
+
+
+@runtime_checkable
 class _TracerProviderLike(Protocol):
     """Minimal ``ctx.tracer_provider`` substrate the composer consumes.
 
@@ -1103,6 +1110,8 @@ class RuntimeLLMDispatcher:
         # ("chat") per §4.2 enum.
         tracer = self.tracer_provider.get_tracer("harness.runtime.llm_dispatch")
         operation = _PROVIDER_OPERATIONS.get(provider_name)
+        if operation is None and isinstance(adapter, _ExternalCLIProviderLike):
+            operation = GenAiOperation.CHAT
         if operation is None:
             # Defensive — every key in self.providers is one of the
             # three constructed at stage 3a per C-RT-05. Surfacing any
@@ -1181,6 +1190,7 @@ class RuntimeLLMDispatcher:
             # --- Step 3: per-provider dispatch --------------------------
             cache_attrs: _AnthropicCacheAttrs | None
             request_attrs: _AnthropicRequestAttrs | None
+            external_cli_attrs: _ExternalCLIAttrs | None = None
             if provider_name == "anthropic":
                 # U-RT-81 (C-RT-15 §14.5.1) — Memory tool callback-injection
                 # composer-step. If `step.step_payload.tools` contains the
@@ -1255,7 +1265,7 @@ class RuntimeLLMDispatcher:
                 )
                 cache_attrs = None
                 request_attrs = None
-            else:  # provider_name == "ollama" (only remaining branch)
+            elif provider_name == "ollama":
                 response, usage_attrs = await _dispatch_ollama(
                     adapter,
                     model,
@@ -1265,11 +1275,27 @@ class RuntimeLLMDispatcher:
                 )
                 cache_attrs = None
                 request_attrs = None
+            elif isinstance(adapter, _ExternalCLIProviderLike):
+                response, usage_attrs, external_cli_attrs = await _dispatch_external_cli(
+                    adapter,
+                    provider_name,
+                    model,
+                    payload,
+                    system=effective_system_prompt,
+                    upstream=upstream_output,
+                )
+                cache_attrs = None
+                request_attrs = None
+            else:
+                raise LLMDispatchProviderUnreachableError(provider_name)
 
             # --- Step 4: populate response-side attributes --------------
             _set_if_present(span, "gen_ai.usage.input_tokens", usage_attrs.input_tokens)
             _set_if_present(span, "gen_ai.usage.output_tokens", usage_attrs.output_tokens)
             _set_if_present(span, "gen_ai.response.id", usage_attrs.response_id)
+            if external_cli_attrs is not None:
+                span.set_attribute("external_cli.exit_code", external_cli_attrs.exit_code)
+                span.set_attribute("external_cli.provider.kind", external_cli_attrs.kind)
 
             # anthropic.* per C-AS-14 §14.2 — emitted ONLY when
             # provider == "anthropic" per AS-AL-3 cross-axis scope.
@@ -1468,6 +1494,12 @@ class _AnthropicRequestAttrs:
     inference_geo: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class _ExternalCLIAttrs:
+    exit_code: int
+    kind: str
+
+
 def _derive_tokenizer_version(model: str) -> str:
     """Per spec §14.2 row 9 — strict reading: `v2` for Opus 4.7+; else `v1`.
 
@@ -1621,6 +1653,46 @@ def _payload_to_ollama_kwargs(
     _inject_leading_system_message(kwargs, system, "ollama")
     _inject_upstream_context_message(kwargs, upstream)
     return kwargs
+
+
+def _payload_to_external_cli_prompt(
+    payload: ProviderAgnosticPayload,
+    *,
+    provider: str,
+    system: str | None = None,
+    upstream: Mapping[str, Any] | None = None,
+) -> str:
+    """Translate provider-neutral messages to one text prompt for local CLIs.
+
+    R-CLI-1 v1 is text-only. Non-empty tools are rejected before the subprocess
+    boundary so a local CLI cannot execute or negotiate tools accidentally.
+    """
+    if payload.tools:
+        raise LLMDispatchPayloadShapeError(
+            f"external CLI provider {provider!r} is text-only; tools are not supported"
+        )
+
+    messages = list(payload.messages)
+    if system and messages and messages[0].get("role") == "system":
+        raise PromptInjectionConflictError(provider, 'messages[0] role:"system"')
+
+    parts: list[str] = []
+    if system:
+        parts.append(f"system:\n{system}")
+    if upstream is not None:
+        rendered_upstream = json.dumps(dict(upstream), sort_keys=True, default=str)
+        parts.append(f"user:\n{_UPSTREAM_CONTEXT_PREFIX}{rendered_upstream}")
+    for message in messages:
+        role = message.get("role", "user")
+        if not isinstance(role, str) or not role:
+            role = "user"
+        content = message.get("content", "")
+        if isinstance(content, str):
+            rendered_content = content
+        else:
+            rendered_content = json.dumps(content, sort_keys=True, default=str)
+        parts.append(f"{role}:\n{rendered_content}")
+    return "\n\n".join(parts)
 
 
 _ANTHROPIC_HITL_MAX_TOOL_TURNS = 16
@@ -1961,6 +2033,46 @@ async def _dispatch_ollama(
         response_id=None,
     )
     return (_response_to_mapping(response), usage_attrs)
+
+
+async def _dispatch_external_cli(
+    adapter: _ExternalCLIProviderLike,
+    provider: str,
+    model: str,
+    payload: ProviderAgnosticPayload,
+    *,
+    system: str | None = None,
+    upstream: Mapping[str, Any] | None = None,
+) -> tuple[Mapping[str, Any], _UsageAttrs, _ExternalCLIAttrs]:
+    """External CLI provider branch — one text prompt, one text response."""
+    prompt = _payload_to_external_cli_prompt(
+        payload,
+        provider=provider,
+        system=system,
+        upstream=upstream,
+    )
+    result = await adapter.dispatch_text(model=model, prompt=prompt)
+    text = getattr(result, "text", None)
+    if not isinstance(text, str):
+        raise LLMDispatchPayloadShapeError(
+            "external CLI provider result missing string text field"
+        )
+    exit_code = getattr(result, "exit_code", 0)
+    if not isinstance(exit_code, int):
+        exit_code = 0
+    kind = getattr(adapter, "kind", "external-cli")
+    if not isinstance(kind, str):
+        kind = "external-cli"
+    response: Mapping[str, Any] = {
+        "provider": provider,
+        "model": model,
+        "content": [{"type": "text", "text": text}],
+    }
+    return (
+        response,
+        _UsageAttrs(input_tokens=None, output_tokens=None, response_id=None),
+        _ExternalCLIAttrs(exit_code=exit_code, kind=kind),
+    )
 
 
 def _response_to_mapping(response: Any) -> Mapping[str, Any]:

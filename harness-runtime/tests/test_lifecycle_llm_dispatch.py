@@ -282,6 +282,24 @@ class _OllamaFakeAdapter:
     client: _OllamaClient
 
 
+@dataclass(frozen=True)
+class _ExternalCLIResult:
+    text: str
+    exit_code: int = 0
+
+
+@dataclass
+class _ExternalCLIFakeAdapter:
+    calls: list[tuple[str, str]]
+
+    async def dispatch_text(self, *, model: str, prompt: str) -> _ExternalCLIResult:
+        self.calls.append((model, prompt))
+        return _ExternalCLIResult(text="OK", exit_code=0)
+
+    async def aclose(self) -> None:
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Fixtures.
 # ---------------------------------------------------------------------------
@@ -749,6 +767,53 @@ async def test_dispatch_ollama_round_trip() -> None:
     assert adapter.client.last_kwargs is not None
     assert adapter.client.last_kwargs["model"] == "test-model-1"
     assert result["message"]["content"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_dispatch_external_cli_round_trip_text_only() -> None:
+    """External CLI providers dispatch one text prompt through `dispatch_text`."""
+    adapter = _ExternalCLIFakeAdapter(calls=[])
+    tp, exporter = _tracer_provider_with_exporter()
+    dispatcher = RuntimeLLMDispatcher(providers={"claude_code": adapter}, tracer_provider=tp)
+
+    result = await dispatcher.dispatch(
+        _binding("claude_code", model="sonnet"),
+        _step(),
+        step_context=_step_context(),
+    )
+
+    assert result["provider"] == "claude_code"
+    assert result["model"] == "sonnet"
+    assert result["content"] == [{"type": "text", "text": "OK"}]
+    assert len(adapter.calls) == 1
+    model, prompt = adapter.calls[0]
+    assert model == "sonnet"
+    assert "user:\nhi" in prompt
+    attrs = exporter.get_finished_spans()[0].attributes or {}
+    assert attrs["gen_ai.provider.name"] == "claude_code"
+    assert attrs["external_cli.exit_code"] == 0
+
+
+@pytest.mark.asyncio
+async def test_dispatch_external_cli_rejects_tools_before_subprocess() -> None:
+    """R-CLI-1 v1 is text-only; tool payloads fail before invoking the CLI."""
+    adapter = _ExternalCLIFakeAdapter(calls=[])
+    tp, _ = _tracer_provider_with_exporter()
+    dispatcher = RuntimeLLMDispatcher(providers={"claude_code": adapter}, tracer_provider=tp)
+    payload = {
+        "messages": [{"role": "user", "content": "hi"}],
+        "tools": [{"name": "not-supported"}],
+        "params": {},
+    }
+
+    with pytest.raises(LLMDispatchPayloadShapeError, match="text-only"):
+        await dispatcher.dispatch(
+            _binding("claude_code", model="sonnet"),
+            _step(payload),
+            step_context=_step_context(),
+        )
+
+    assert adapter.calls == []
 
 
 # ---------------------------------------------------------------------------

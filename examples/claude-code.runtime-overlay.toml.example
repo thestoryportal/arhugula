@@ -1,0 +1,29 @@
+# Paired runtime overlay for routing examples/minimal.toml through Claude Code.
+#
+# This overlay uses the already-authenticated local `claude` CLI as the provider
+# boundary. It contains no OAuth/session tokens and no hosted API keys; authenticate
+# the CLI itself first and verify with:
+#
+#     claude auth status --json
+#
+# The command should report `"loggedIn": true` before you use this overlay.
+
+[runtime]
+enabled_provider_names = ["claude_code"]
+
+[[runtime.external_cli_providers]]
+provider = "claude_code"
+kind = "claude-code"
+command = "claude"
+timeout_seconds = 120
+auth_check = true
+optional = false
+
+[runtime.routing_manifest]
+manifest_version = 1
+per_role_bindings = {}
+per_workload_overrides = {}
+retry_policies = {}
+fallback_chains = [
+    { primary = { provider = "claude_code", model = "sonnet", family = "anthropic" }, same_family = [], cross_family = [] },
+]
