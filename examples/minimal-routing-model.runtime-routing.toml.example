@@ -1,0 +1,21 @@
+# Paired runtime routing sample for examples/minimal-routing-model.toml.
+#
+# This is a [runtime.routing_manifest] table snippet, not a complete
+# RuntimeConfig. Start from harness.toml.example, set your local paths in
+# harness.toml, configure provider credentials through .env/keyring as described
+# in examples/README.md, then replace harness.toml's [runtime.routing_manifest]
+# table with this one.
+#
+# In the current one-shot dispatch path, this runtime fallback chain is the
+# effective model-control surface. The paired workflow manifest's
+# default_model_binding documents the same intent, but this table is what
+# makes the dispatched LLM span report claude-sonnet-4-6.
+
+[runtime.routing_manifest]
+manifest_version = 1
+per_role_bindings = {}
+per_workload_overrides = {}
+retry_policies = {}
+fallback_chains = [
+    { primary = { provider = "anthropic", model = "claude-sonnet-4-6", family = "anthropic" }, same_family = [], cross_family = [] },
+]

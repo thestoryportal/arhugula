@@ -1,7 +1,8 @@
 # Examples — running the harness CLI
 
-This directory holds operator-runnable workflow manifests. `minimal.toml` is
-the smallest workflow that reaches a real LLM dispatch — the MVP smoke test.
+This directory holds operator-runnable workflow manifests and paired config
+snippets. `minimal.toml` is the smallest workflow that reaches a real LLM
+dispatch — the MVP smoke test.
 
 ## One-time setup
 
@@ -53,6 +54,22 @@ and writes the state-ledger entries to the `STATE_LEDGER` path bound in
 
 Exit codes: `0` success · `1` workflow failure · `2` manifest error ·
 `3` config error · `4` bootstrap error.
+
+## Run the Sonnet routing pair
+
+`minimal-routing-model.toml` pairs with
+`minimal-routing-model.runtime-routing.toml.example`. The workflow manifest
+records the Sonnet intent; the runtime routing snippet shows the
+`[runtime.routing_manifest]` table that must replace the matching table in
+local `harness.toml` for the current one-shot path to dispatch Sonnet.
+
+After applying that runtime routing table, run:
+
+```sh
+just run examples/minimal-routing-model.toml
+```
+
+The expected LLM span is `chat claude-sonnet-4-6`.
 
 ## Notes
 

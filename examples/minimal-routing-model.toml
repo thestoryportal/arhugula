@@ -12,6 +12,8 @@
 #     runtime path, the dispatched model is still governed by
 #     harness.toml's [runtime.routing_manifest].fallback_chains[0] unless
 #     that runtime fallback chain is changed too.
+#   * The paired runtime routing snippet is:
+#     examples/minimal-routing-model.runtime-routing.toml.example
 #
 # Shape notes:
 #   * workload_class = "pipeline-automation" + topology_pattern =
