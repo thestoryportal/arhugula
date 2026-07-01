@@ -12,7 +12,11 @@ uv sync --all-packages
 just init-local
 ```
 
-Then edit `.env` and set `ANTHROPIC_API_KEY` for the shipped minimal workflow.
+Then edit `.env` and set `ANTHROPIC_API_KEY` for the shipped minimal workflow:
+
+```sh
+${EDITOR:-vi} .env
+```
 
 Run the smoke workflow:
 
@@ -22,6 +26,48 @@ just run examples/minimal.toml
 
 The first run writes runtime state to `.harness/state.jsonl` and uses the paths
 created by `just init-local`.
+
+## Common Example Commands
+
+Create a temp config from `harness.toml` plus an example runtime overlay. This
+prints the temp config path and does not modify `harness.toml`:
+
+```sh
+SONNET_CONFIG="$(just example-config examples/minimal-routing-model.runtime-routing.toml.example)"
+uv run harness run examples/minimal-routing-model.toml --config "$SONNET_CONFIG"
+```
+
+Set up local Ollama for the Ollama examples:
+
+```sh
+ollama pull llama3.2:3b
+curl -sf http://127.0.0.1:11434/api/tags
+```
+
+Run the local Ollama recovery example:
+
+```sh
+RECOVERY_CONFIG="$(just example-config examples/recovery-ollama-fallback.runtime-overlay.toml.example)"
+env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY \
+  PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring \
+  uv run harness run examples/recovery-ollama-fallback.toml --config "$RECOVERY_CONFIG"
+```
+
+Start the local observability stack, then run the topology fan-out example:
+
+```sh
+just r420-self-hosted-stack-up
+TOPOLOGY_CONFIG="$(just example-config examples/topology-parallelization-ollama.runtime-overlay.toml.example)"
+env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY \
+  PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring \
+  uv run harness run examples/topology-parallelization-ollama.toml --config "$TOPOLOGY_CONFIG"
+```
+
+Stop the observability stack:
+
+```sh
+just r420-self-hosted-stack-down
+```
 
 ## What Is Included
 

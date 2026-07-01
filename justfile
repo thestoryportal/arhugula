@@ -30,6 +30,10 @@ check-local: sync lint typecheck test
 run file:
     uv run harness run {{file}} --config harness.toml
 
+# Materialize a temp harness config by applying an example runtime overlay.
+example-config overlay:
+    @uv run python tools/apply_example_runtime_overlay.py {{overlay}}
+
 # Start the daemon over its configured Unix socket.
 daemon:
     uv run harness daemon --config harness.toml

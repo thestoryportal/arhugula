@@ -6,22 +6,22 @@ dispatch — the MVP smoke test.
 
 ## One-time setup
 
-1. **Runtime config.** Copy the template and edit the absolute paths:
+1. **Install and initialize.** From the repository root:
 
    ```sh
-   cp harness.toml.example harness.toml
+   uv sync --all-packages
+   just init-local
    ```
 
-   At minimum, set `repository_root` and the four `path_bindings.raw_entries`
-   paths to real directories on your machine. The template's `workflow_class`
-   values are `pipeline-automation` to match `examples/minimal.toml`.
+   `just init-local` creates local runtime directories plus gitignored
+   `harness.toml` and `.env` files. It preserves existing local files unless
+   explicitly forced.
 
-2. **API key.** Copy the secrets template and set your Anthropic key:
+2. **API key.** Edit `.env` and set your Anthropic key:
 
    ```sh
-   cp .env.example .env
    chmod 600 .env
-   # edit .env: ANTHROPIC_API_KEY=sk-ant-...
+   ${EDITOR:-vi} .env
    ```
 
    The `justfile` loads `.env` automatically (`set dotenv-load := true`). The
@@ -62,14 +62,28 @@ Exit codes: `0` success · `1` workflow failure · `2` manifest error ·
 records the Sonnet intent; the runtime routing snippet shows the
 `[runtime.routing_manifest]` table that must replace the matching table in
 local `harness.toml` for the current one-shot path to dispatch Sonnet.
+The `example-config` helper applies that runtime routing table to a temp copy
+of `harness.toml`, prints the temp path, and leaves `harness.toml` unchanged.
 
-After applying that runtime routing table, run:
+Run:
 
 ```sh
-just run examples/minimal-routing-model.toml
+SONNET_CONFIG="$(just example-config examples/minimal-routing-model.runtime-routing.toml.example)"
+uv run harness run examples/minimal-routing-model.toml --config "$SONNET_CONFIG"
 ```
 
 The expected LLM span is `chat claude-sonnet-4-6`.
+
+## Set up local Ollama
+
+The Ollama examples require Ollama listening on `127.0.0.1:11434` with
+`llama3.2:3b` pulled locally. If the readiness check fails, start the Ollama app
+or run `ollama serve` in another terminal.
+
+```sh
+ollama pull llama3.2:3b
+curl -sf http://127.0.0.1:11434/api/tags
+```
 
 ## Run the Ollama recovery pair
 
@@ -80,18 +94,37 @@ unavailable, the reserved `llm_dispatch` retry policy exhausts it, and the
 runtime fallback chain recovers to local `llama3.2:3b`.
 
 Use it after `llama3.2:3b` is pulled locally and Ollama is listening on
-`127.0.0.1:11434`. Apply the runtime overlay to a temp copy of `harness.toml`,
-then run with hosted credentials disabled:
+`127.0.0.1:11434`. Materialize a temp config from the runtime overlay, then run
+with hosted credentials disabled:
 
 ```sh
+RECOVERY_CONFIG="$(just example-config examples/recovery-ollama-fallback.runtime-overlay.toml.example)"
 env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY \
   PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring \
-  uv run harness run examples/recovery-ollama-fallback.toml --config <temp-config>
+  uv run harness run examples/recovery-ollama-fallback.toml --config "$RECOVERY_CONFIG"
 ```
 
 With the self-hosted observability stack running, the expected trace contains
 failed `chat llama-nonexistent-model-r300-fallback-probe` spans followed by a
 successful `chat llama3.2:3b` span, all with `gen_ai.provider.name = "ollama"`.
+
+## Start and stop local observability
+
+The local self-hosted observability stack exposes OTLP gRPC on
+`127.0.0.1:4317`, OTLP HTTP on `127.0.0.1:4318`, Tempo on
+`127.0.0.1:3200`, and Grafana on `127.0.0.1:3000`.
+
+```sh
+just r420-self-hosted-stack-up
+just r420-self-hosted-stack-status
+curl -sf http://127.0.0.1:3200/ready
+```
+
+Stop it with:
+
+```sh
+just r420-self-hosted-stack-down
+```
 
 ## Run the Ollama parallelization pair
 
@@ -109,14 +142,14 @@ self-hosted observability stack first:
 just r420-self-hosted-stack-up
 ```
 
-Create a temp config from `harness.toml`, apply the runtime overlay, replace
-`/absolute/path/to/arhugula` with this checkout's absolute path, then run with
-hosted credentials disabled:
+Materialize a temp config from the runtime overlay, then run with hosted
+credentials disabled:
 
 ```sh
+TOPOLOGY_CONFIG="$(just example-config examples/topology-parallelization-ollama.runtime-overlay.toml.example)"
 env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY \
   PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring \
-  uv run harness run examples/topology-parallelization-ollama.toml --config <temp-config>
+  uv run harness run examples/topology-parallelization-ollama.toml --config "$TOPOLOGY_CONFIG"
 ```
 
 The expected state-ledger workflow rows are branch rows, not linear
