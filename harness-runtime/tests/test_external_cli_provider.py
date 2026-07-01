@@ -11,7 +11,11 @@ from harness_runtime.lifecycle.external_cli_provider import (
     ExternalCLINotAuthenticatedError,
     ExternalCLIProcessTimeout,
     RecordingSubprocessRunner,
+    construct_antigravity_cli_adapter,
     construct_claude_code_cli_adapter,
+    construct_codex_cli_adapter,
+    construct_gemini_cli_adapter,
+    construct_generic_command_cli_adapter,
 )
 from harness_runtime.types import ExternalCLIProviderConfig
 
@@ -37,6 +41,21 @@ def _config(**overrides: object) -> ExternalCLIProviderConfig:
         provider="claude_code",
         kind="claude-code",
         command="claude",
+        timeout_seconds=42.0,
+        **overrides,
+    )
+
+
+def _provider_config(
+    provider: str,
+    kind: str,
+    command: str,
+    **overrides: object,
+) -> ExternalCLIProviderConfig:
+    return ExternalCLIProviderConfig(
+        provider=provider,
+        kind=kind,
+        command=command,
         timeout_seconds=42.0,
         **overrides,
     )
@@ -148,3 +167,178 @@ async def test_claude_dispatch_timeout_is_typed() -> None:
 
     with pytest.raises(ExternalCLIProcessTimeout):
         await adapter.dispatch_text(model="sonnet", prompt="Reply OK")
+
+
+@pytest.mark.asyncio
+async def test_construct_codex_adapter_checks_login_status_without_token_access() -> None:
+    runner = _FakeRunner(
+        results=[CLIProcessResult(exit_code=0, stdout="Logged in using ChatGPT\n", stderr="")],
+        calls=[],
+    )
+
+    adapter = await construct_codex_cli_adapter(
+        _provider_config("codex", "codex", "codex"),
+        runner=runner,
+    )
+
+    assert adapter.provider_name == "codex"
+    assert runner.calls == [(("codex", "login", "status"), "", 42.0)]
+
+
+@pytest.mark.asyncio
+async def test_codex_dispatch_uses_ephemeral_jsonl_stdin_and_extracts_agent_message() -> None:
+    runner = _FakeRunner(
+        results=[
+            CLIProcessResult(exit_code=0, stdout="Logged in using ChatGPT\n", stderr=""),
+            CLIProcessResult(
+                exit_code=0,
+                stdout=(
+                    '{"type":"thread.started","thread_id":"t"}\n'
+                    '{"type":"item.completed","item":{"type":"agent_message","text":"OK"}}\n'
+                    '{"type":"turn.completed","usage":{"input_tokens":1}}\n'
+                ),
+                stderr="",
+            ),
+        ],
+        calls=[],
+    )
+    adapter = await construct_codex_cli_adapter(
+        _provider_config("codex", "codex", "codex"),
+        runner=runner,
+    )
+
+    result = await adapter.dispatch_text(model="gpt-5", prompt="Reply OK")
+
+    assert result.text == "OK"
+    argv, stdin, timeout = runner.calls[1]
+    assert argv == (
+        "codex",
+        "exec",
+        "--json",
+        "--ephemeral",
+        "--skip-git-repo-check",
+        "--sandbox",
+        "read-only",
+        "-m",
+        "gpt-5",
+        "-",
+    )
+    assert stdin == "Reply OK"
+    assert timeout == 42.0
+
+
+@pytest.mark.asyncio
+async def test_construct_antigravity_adapter_checks_models_without_token_access() -> None:
+    runner = _FakeRunner(
+        results=[
+            CLIProcessResult(
+                exit_code=0,
+                stdout="Gemini 3.5 Flash (Low)\nClaude Sonnet 4.6 (Thinking)\n",
+                stderr="",
+            )
+        ],
+        calls=[],
+    )
+
+    adapter = await construct_antigravity_cli_adapter(
+        _provider_config("antigravity", "antigravity", "agy"),
+        runner=runner,
+    )
+
+    assert adapter.provider_name == "antigravity"
+    assert runner.calls == [(("agy", "models"), "", 42.0)]
+
+
+@pytest.mark.asyncio
+async def test_antigravity_dispatch_uses_print_mode_and_extracts_stdout() -> None:
+    runner = _FakeRunner(
+        results=[
+            CLIProcessResult(exit_code=0, stdout="Gemini 3.5 Flash (Low)\n", stderr=""),
+            CLIProcessResult(exit_code=0, stdout="OK\n", stderr=""),
+        ],
+        calls=[],
+    )
+    adapter = await construct_antigravity_cli_adapter(
+        _provider_config("antigravity", "antigravity", "agy"),
+        runner=runner,
+    )
+
+    result = await adapter.dispatch_text(
+        model="Gemini 3.5 Flash (Low)",
+        prompt="Reply OK",
+    )
+
+    assert result.text == "OK"
+    argv, stdin, timeout = runner.calls[1]
+    assert argv == (
+        "agy",
+        "--print",
+        "Reply OK",
+        "--model",
+        "Gemini 3.5 Flash (Low)",
+        "--print-timeout",
+        "42s",
+        "--sandbox",
+    )
+    assert stdin == ""
+    assert timeout == 42.0
+
+
+@pytest.mark.asyncio
+async def test_gemini_dispatch_uses_headless_text_prompt_skip_trust_and_extracts_stdout() -> None:
+    runner = _FakeRunner(
+        results=[CLIProcessResult(exit_code=0, stdout="OK\n", stderr="")],
+        calls=[],
+    )
+    adapter = await construct_gemini_cli_adapter(
+        _provider_config("gemini", "gemini", "gemini", auth_check=False),
+        runner=runner,
+    )
+
+    result = await adapter.dispatch_text(model="gemini-2.5-flash", prompt="Reply OK")
+
+    assert result.text == "OK"
+    assert runner.calls == [
+        (
+            (
+                "gemini",
+                "--skip-trust",
+                "-m",
+                "gemini-2.5-flash",
+                "-p",
+                "Reply OK",
+            ),
+            "",
+            42.0,
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_generic_command_adapter_uses_configured_templates_and_stdin() -> None:
+    runner = _FakeRunner(
+        results=[
+            CLIProcessResult(exit_code=0, stdout="authenticated\n", stderr=""),
+            CLIProcessResult(exit_code=0, stdout='{"response": "OK"}', stderr=""),
+        ],
+        calls=[],
+    )
+    adapter = await construct_generic_command_cli_adapter(
+        _provider_config(
+            "local_llm",
+            "generic-command",
+            "my-llm",
+            args=("--model", "{model}", "--json"),
+            auth_args=("auth", "status"),
+            response_format="json",
+        ),
+        runner=runner,
+    )
+
+    result = await adapter.dispatch_text(model="demo-model", prompt="Reply OK")
+
+    assert result.text == "OK"
+    assert runner.calls == [
+        (("my-llm", "auth", "status"), "", 42.0),
+        (("my-llm", "--model", "demo-model", "--json"), "Reply OK", 42.0),
+    ]

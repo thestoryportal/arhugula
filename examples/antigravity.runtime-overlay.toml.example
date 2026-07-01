@@ -1,0 +1,32 @@
+# Paired runtime overlay for routing examples/minimal.toml through Antigravity CLI.
+#
+# This overlay uses the already-authenticated local `agy` CLI as the provider
+# boundary. It contains no OAuth/session tokens and no hosted API keys;
+# authenticate Antigravity itself first:
+#
+#     curl -fsSL https://antigravity.google/cli/install.sh | bash
+#     agy
+#     agy models
+#
+# The adapter checks auth/model availability with `agy models` and dispatches
+# through `agy --print <prompt> --model <model> --sandbox`.
+
+[runtime]
+enabled_provider_names = ["antigravity"]
+
+[[runtime.external_cli_providers]]
+provider = "antigravity"
+kind = "antigravity"
+command = "agy"
+timeout_seconds = 120
+auth_check = true
+optional = false
+
+[runtime.routing_manifest]
+manifest_version = 1
+per_role_bindings = {}
+per_workload_overrides = {}
+retry_policies = {}
+fallback_chains = [
+    { primary = { provider = "antigravity", model = "Gemini 3.5 Flash (Low)", family = "google" }, same_family = [], cross_family = [] },
+]

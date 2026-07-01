@@ -23,6 +23,7 @@ include_paths = [
   "pyproject.toml",
   "tests",
   "tools/apply_example_runtime_overlay.py",
+  "tools/external_cli_provider_config.py",
   "tools/managed_cloud_readiness.py",
   "tools/portable_init.py",
   "tools/portable_source_package.py",

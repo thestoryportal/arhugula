@@ -92,7 +92,8 @@ def _render(result: InitResult) -> str:
     lines.extend(
         [
             "next:",
-            "- edit .env and set ANTHROPIC_API_KEY for examples/minimal.toml",
+            "- authenticate at least one local CLI: claude, codex, or agy",
+            "- optionally set API keys for secondary SDK fallback",
             "- run: uv sync --all-packages",
             "- run: just run examples/minimal.toml",
         ]

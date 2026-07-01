@@ -53,6 +53,17 @@ provider optionality flags, and a routing manifest fallback chain. Optional
 runtime features are exposed as explicit `RuntimeConfig` fields and default off
 unless their type declares a default sub-config.
 
+External CLI providers are configured with:
+
+| Field | Meaning |
+| --- | --- |
+| `enabled_provider_names` | Provider keys stage 3a should construct. Defaults to `["claude_code", "codex", "antigravity", "anthropic", "openai", "ollama"]`. |
+| `external_cli_providers` | Local CLI provider entries containing executable metadata only; the default entries are optional OAuth/session-backed CLI providers. |
+| `external_cli_providers[].kind` | Built-ins: `claude-code`, `codex`, `antigravity`, legacy `gemini`; custom: `generic-command`. |
+| `external_cli_providers[].args` | Generic-command inference argv templates; supports `{model}` and, with `prompt_transport = "arg"`, `{prompt}`. |
+| `external_cli_providers[].auth_args` | Optional generic auth/status argv suffix. |
+| `external_cli_providers[].response_format` | `text`, `json`, or `jsonl` stdout parsing. |
+
 ## Config Load Order
 
 The runtime config source loads environment values, then TOML file values, then
@@ -78,6 +89,8 @@ surface admissibility is checked at runtime dispatch.
 
 | Recipe | Purpose |
 | --- | --- |
+| `just external-cli-config <provider>` | Materialize a temp config for `claude_code`, `codex`, `antigravity`, legacy `gemini`, or a custom `generic-command` provider without editing tracked files. |
+| `just example-config <overlay>` | Materialize a temp config by applying an example runtime overlay. |
 | `just codex-preflight` | Write/check deterministic local context before work. |
 | `just overlay-check` | Re-derive semantic overlay and fail on hard CXA/stale-artifact drift. |
 | `just q4-packaging-check` | Build package artifacts and validate deploy image/readiness surface. |

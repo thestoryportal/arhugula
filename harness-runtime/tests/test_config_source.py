@@ -347,6 +347,38 @@ def test_external_cli_provider_config_loads_from_harness_toml(tmp_path: Path) ->
     assert provider.timeout_seconds == 90.0
 
 
+def test_generic_external_cli_provider_config_loads_from_harness_toml(tmp_path: Path) -> None:
+    """Generic command-backed providers load argv metadata without secrets."""
+    config_file = tmp_path / "harness.toml"
+    config_file.write_text(
+        "[runtime]\n"
+        'deployment_surface = "local-development"\n'
+        f'repository_root = "{tmp_path}"\n'
+        'default_topology = "single-threaded-linear"\n'
+        'enabled_provider_names = ["local_llm"]\n'
+        "\n"
+        "[runtime.otel]\n"
+        'otlp_endpoint = "http://localhost:4318"\n'
+        "\n"
+        "[[runtime.external_cli_providers]]\n"
+        'provider = "local_llm"\n'
+        'kind = "generic-command"\n'
+        'command = "my-llm"\n'
+        'args = ["--model", "{model}", "--json"]\n'
+        'auth_args = ["auth", "status"]\n'
+        'response_format = "json"\n',
+        encoding="utf-8",
+    )
+
+    cfg = RuntimeConfigSource.load(config_file=config_file)
+
+    provider = cfg.external_cli_providers[0]
+    assert provider.provider == "local_llm"
+    assert provider.args == ("--model", "{model}", "--json")
+    assert provider.auth_args == ("auth", "status")
+    assert provider.response_format == "json"
+
+
 # Per `[[finding-runtime-config-loader-unreachable-sub-configs]]` fix (B):
 # the SCHEMA FIELD NAME `provider_secrets` (a TOML sub-table name) MUST NOT
 # false-match the plaintext-secret detector. The leaf-vs-table discrimination

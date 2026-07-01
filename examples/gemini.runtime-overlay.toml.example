@@ -1,0 +1,33 @@
+# Legacy paired runtime overlay for routing examples/minimal.toml through Gemini CLI.
+#
+# Gemini CLI is deprecated in favor of Antigravity CLI. Keep this overlay only
+# for existing installs that still have the local `gemini` binary and its
+# headless prompt mode. Antigravity's documented `agy` CLI is currently an
+# interactive TUI and should not be substituted here without a verified
+# noninteractive stdout mode. This overlay contains no OAuth/session tokens and
+# no hosted API keys; authenticate the CLI itself.
+#
+# The Gemini adapter follows the CLI's headless text prompt interface, passes
+# --skip-trust for the current session to avoid a fresh-checkout trust prompt,
+# and lets the official CLI surface auth/session errors during inference. This
+# example disables construction-time auth_check.
+
+[runtime]
+enabled_provider_names = ["gemini"]
+
+[[runtime.external_cli_providers]]
+provider = "gemini"
+kind = "gemini"
+command = "gemini"
+timeout_seconds = 120
+auth_check = false
+optional = false
+
+[runtime.routing_manifest]
+manifest_version = 1
+per_role_bindings = {}
+per_workload_overrides = {}
+retry_policies = {}
+fallback_chains = [
+    { primary = { provider = "gemini", model = "gemini-2.5-flash", family = "google" }, same_family = [], cross_family = [] },
+]

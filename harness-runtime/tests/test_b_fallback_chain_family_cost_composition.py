@@ -143,6 +143,7 @@ class _ShutdownReport:
         ("anthropic", CrossFamilyTag.FRONTIER_MANAGED),
         ("openai", CrossFamilyTag.FRONTIER_MANAGED_ALT),
         ("google", CrossFamilyTag.FRONTIER_MANAGED_ALT),  # §15.1 "OpenAI/Gemini" grouping
+        ("antigravity", CrossFamilyTag.FRONTIER_MANAGED_ALT),
         ("gemini", CrossFamilyTag.FRONTIER_MANAGED_ALT),
         ("ollama", CrossFamilyTag.LOCAL_OLLAMA),
     ],
@@ -167,7 +168,10 @@ def test_cross_family_tag_for_provider_unknown_falls_back_local_ollama() -> None
 def test_provider_family_for_provider_maps_and_falls_back() -> None:
     assert provider_family_for_provider("anthropic") is ProviderFamily.ANTHROPIC
     assert provider_family_for_provider("openai") is ProviderFamily.OPENAI
+    assert provider_family_for_provider("codex") is ProviderFamily.OPENAI
     assert provider_family_for_provider("google") is ProviderFamily.GOOGLE
+    assert provider_family_for_provider("antigravity") is ProviderFamily.GOOGLE
+    assert provider_family_for_provider("gemini") is ProviderFamily.GOOGLE
     assert provider_family_for_provider("ollama") is ProviderFamily.LOCAL_OPEN_WEIGHT
     assert provider_family_for_provider("nonsense") is ProviderFamily.LOCAL_OPEN_WEIGHT
 

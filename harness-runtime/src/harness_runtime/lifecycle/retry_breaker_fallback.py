@@ -134,6 +134,9 @@ base_delay_seconds=0.2, delay_cap_seconds=10.0)``. The registry carries
 from the ``RuntimeRetryBreaker`` instance bound at stage 3b."""
 
 
+_MAX_FAILURE_DETAIL_CHARS = 500
+
+
 class RetryBreakerFallbackExhaustedError(Exception):
     """Raised when the fallback chain exhausts after per-candidate retry
     exhaustion (every candidate either fails-fast or hits ``max_attempts``).
@@ -146,12 +149,35 @@ class RetryBreakerFallbackExhaustedError(Exception):
     Carries the last failed candidate for operator-facing attribution.
     """
 
-    def __init__(self, failed: ProviderCandidate) -> None:
+    def __init__(
+        self,
+        failed: ProviderCandidate,
+        *,
+        last_failure_class: str | None = None,
+        last_failure_detail: str | None = None,
+    ) -> None:
         self.failed = failed
-        super().__init__(
+        self.last_failure_class = last_failure_class
+        self.last_failure_detail = last_failure_detail
+        message = (
             f"RT-FAIL-FALLBACK-EXHAUSTED: fallback chain exhausted after "
             f"candidate {failed.provider}:{failed.model} (chain traversal complete)"
         )
+        if last_failure_detail is not None:
+            message = f"{message}; last failure: {last_failure_detail}"
+        super().__init__(message)
+
+
+def _failure_detail(exc: BaseException) -> str:
+    """Bound and normalize a provider exception for operator-facing errors."""
+    detail = " ".join(str(exc).split())
+    if detail:
+        value = f"{type(exc).__name__}: {detail}"
+    else:
+        value = type(exc).__name__
+    if len(value) > _MAX_FAILURE_DETAIL_CHARS:
+        return f"{value[: _MAX_FAILURE_DETAIL_CHARS - 3]}..."
+    return value
 
 
 def _rebind_to_candidate(
@@ -453,6 +479,7 @@ class RetryBreakerFallbackDispatcher:
             chain = self._effective_chain(binding, step_context.agent_role, routed=routed)
             candidate: ProviderCandidate = chain.primary
             last_failure_class: str | None = None
+            last_failure_detail: str | None = None
             chain_length = _chain_length(chain)
             outer_span.set_attribute("fallback.chain_length", chain_length)
             # C-CP-03 §3.3 ``capability_required`` — constant across the chain
@@ -492,6 +519,7 @@ class RetryBreakerFallbackDispatcher:
                         },
                     )
                     last_failure_class = "capability-shortfall"
+                    last_failure_detail = None
                     candidate = self._advance_or_exhaust(
                         candidate,
                         outer_span,
@@ -499,6 +527,7 @@ class RetryBreakerFallbackDispatcher:
                         chain_length,
                         chain=chain,
                         exhaustion_cause="capability-shortfall",
+                        last_failure_detail=last_failure_detail,
                     )
                     continue
 
@@ -524,8 +553,14 @@ class RetryBreakerFallbackDispatcher:
                         },
                     )
                     last_failure_class = "breaker-open"
+                    last_failure_detail = None
                     candidate = self._advance_or_exhaust(
-                        candidate, outer_span, last_failure_class, chain_length, chain=chain
+                        candidate,
+                        outer_span,
+                        last_failure_class,
+                        chain_length,
+                        chain=chain,
+                        last_failure_detail=last_failure_detail,
                     )
                     continue
 
@@ -567,8 +602,14 @@ class RetryBreakerFallbackDispatcher:
 
                 # Candidate abandoned; advance to next.
                 last_failure_class = attempt_terminal.last_failure_class
+                last_failure_detail = attempt_terminal.last_failure_detail
                 candidate = self._advance_or_exhaust(
-                    candidate, outer_span, last_failure_class, chain_length, chain=chain
+                    candidate,
+                    outer_span,
+                    last_failure_class,
+                    chain_length,
+                    chain=chain,
+                    last_failure_detail=last_failure_detail,
                 )
 
     def _effective_chain(
@@ -696,6 +737,7 @@ class RetryBreakerFallbackDispatcher:
         *,
         chain: FallbackChain,
         exhaustion_cause: str = "per-candidate-retry-exhaustion",
+        last_failure_detail: str | None = None,
     ) -> ProviderCandidate:
         """Advance to the next candidate or raise on exhaustion (Step 5).
 
@@ -716,15 +758,22 @@ class RetryBreakerFallbackDispatcher:
         try:
             next_candidate, _result = advance_or_raise(chain, failed)
         except FallbackChainExhaustedError as exc:
+            attributes: dict[str, Any] = {
+                "fallback.chain_length": chain_length,
+                "fallback.last_failure_class": last_failure_class or "unknown",
+                "fallback.exhaustion_cause": exhaustion_cause,
+            }
+            if last_failure_detail is not None:
+                attributes["fallback.last_failure_detail"] = last_failure_detail
             outer_span.add_event(
                 "fallback.exhausted",
-                attributes={
-                    "fallback.chain_length": chain_length,
-                    "fallback.last_failure_class": last_failure_class or "unknown",
-                    "fallback.exhaustion_cause": exhaustion_cause,
-                },
+                attributes=attributes,
             )
-            raise RetryBreakerFallbackExhaustedError(failed) from exc
+            raise RetryBreakerFallbackExhaustedError(
+                failed,
+                last_failure_class=last_failure_class,
+                last_failure_detail=last_failure_detail,
+            ) from exc
         return next_candidate
 
     async def _run_per_candidate_attempts(
@@ -758,6 +807,7 @@ class RetryBreakerFallbackDispatcher:
         """
         rebound = _rebind_to_candidate(binding, candidate)
         last_failure_class: str | None = None
+        last_failure_detail: str | None = None
 
         # Derive the canonical attribute values that don't depend on per-attempt state.
         original_span_id_hex = _format_span_id_hex(outer_span)
@@ -780,6 +830,7 @@ class RetryBreakerFallbackDispatcher:
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:
+                    last_failure_detail = _failure_detail(exc)
                     if _is_hitl_terminal_control_flow(exc):
                         # Terminal HITL gate decision (REJECT / EDIT-decode /
                         # cell-excluded / timeout / placement-foreclosed / audit-
@@ -805,7 +856,9 @@ class RetryBreakerFallbackDispatcher:
                             self._emit_breaker_transition(transition, outer_span)
                         last_failure_class = type(exc).__name__
                         return _PerCandidateTerminal(
-                            result=None, last_failure_class=last_failure_class
+                            result=None,
+                            last_failure_class=last_failure_class,
+                            last_failure_detail=last_failure_detail,
                         )
 
                     # Transient: classify via staircase. STAGE_1 is passed as
@@ -847,7 +900,9 @@ class RetryBreakerFallbackDispatcher:
                             self._emit_breaker_transition(transition, outer_span)
                         last_failure_class = "max-attempts"
                         return _PerCandidateTerminal(
-                            result=None, last_failure_class=last_failure_class
+                            result=None,
+                            last_failure_class=last_failure_class,
+                            last_failure_detail=last_failure_detail,
                         )
                     else:
                         # Escalation: cross-family-fallback / local-terminal /
@@ -864,7 +919,9 @@ class RetryBreakerFallbackDispatcher:
                             self._emit_breaker_transition(transition, outer_span)
                         last_failure_class = cause.value
                         return _PerCandidateTerminal(
-                            result=None, last_failure_class=last_failure_class
+                            result=None,
+                            last_failure_class=last_failure_class,
+                            last_failure_detail=last_failure_detail,
                         )
                 else:
                     # Success. `retry.fail_class` is canonically only set on
@@ -876,7 +933,9 @@ class RetryBreakerFallbackDispatcher:
                     transition = breaker.record_success()
                     if transition is not None:
                         self._emit_breaker_transition(transition, outer_span)
-                    return _PerCandidateTerminal(result=result, last_failure_class=None)
+                    return _PerCandidateTerminal(
+                        result=result, last_failure_class=None, last_failure_detail=None
+                    )
 
             # Sleep between retries (outside the inner span CM).
             await self.sleep_fn(self.retry_breaker.compute_delay_seconds(attempt))
@@ -887,6 +946,7 @@ class RetryBreakerFallbackDispatcher:
         return _PerCandidateTerminal(
             result=None,
             last_failure_class=last_failure_class or "max-attempts",
+            last_failure_detail=last_failure_detail,
         )
 
     def _emit_breaker_transition(self, transition: Any, parent_span: Any) -> None:
@@ -904,11 +964,14 @@ class _PerCandidateTerminal:
 
     ``result`` non-None iff a successful dispatch occurred (return path).
     Otherwise ``last_failure_class`` carries the last attribution token for
-    the outer ``fallback.exhausted`` event.
+    the outer ``fallback.exhausted`` event, and ``last_failure_detail`` carries
+    a bounded operator-facing provider exception summary when a provider call
+    actually failed.
     """
 
     result: Mapping[str, Any] | None
     last_failure_class: str | None
+    last_failure_detail: str | None
 
 
 def _format_span_id_hex(span: Any) -> str:

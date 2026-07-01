@@ -45,15 +45,14 @@ default_topology = "single-threaded-linear"
 # Optional. Multi-tenant separation key; None = single-tenant.
 # tenant_id = "team-alpha"
 
-# Optional provider construction allowlist flags. If True, the named
-# provider may fail at stage 3a (keyring miss / network unreachable)
+# Optional SDK/API-key provider construction allowlist flags. If True, the named
+# SDK provider may fail at stage 3a (keyring miss / network unreachable)
 # without halting bootstrap (it surfaces as `RT-FAIL-PROVIDER-DEGRADED`
 # warning and bootstrap continues without that provider in the context).
 # Auth errors (401/403) ALWAYS surface regardless of these flags.
-# Defaults: anthropic = openai = False (hard-fail); ollama = False.
-# For operators without all three keyring entries, set the unwanted
-# providers to True.
-anthropic_optional = false
+# Defaults: anthropic = openai = ollama = true.
+# These flags matter only when the matching SDK/API-key provider is enabled.
+anthropic_optional = true
 openai_optional = true
 ollama_optional = true
 
@@ -61,23 +60,47 @@ ollama_optional = true
 # `http://localhost:11434`.
 # ollama_host = "http://localhost:11434"
 
-# Optional. Provider construction allowlist. Defaults to all built-in
-# providers: ["anthropic", "openai", "ollama"]. To route through an
-# already-authenticated local CLI only, set this to the external provider
-# key and add a matching `runtime.external_cli_providers` table below.
-# enabled_provider_names = ["claude_code"]
+# Provider construction allowlist. Defaults prefer local OAuth/session-backed
+# CLIs over hosted API-key SDKs, while keeping SDK/API providers available as
+# secondary fallbacks.
+enabled_provider_names = ["claude_code", "codex", "antigravity", "anthropic", "openai", "ollama"]
 
-# Optional. Subscription-backed local CLI provider config. This table carries
-# executable metadata only. Do not put OAuth/session tokens or hosted API keys
-# here; authenticate the official CLI itself and let it own its local session.
+# Subscription-backed local CLI provider configs. These tables carry executable
+# metadata only. Do not put OAuth/session tokens or hosted API keys here;
+# authenticate each official CLI itself and let it own its local session.
+[[runtime.external_cli_providers]]
+provider = "claude_code"
+kind = "claude-code"
+command = "claude"
+timeout_seconds = 120
+auth_check = true
+optional = true
+
+[[runtime.external_cli_providers]]
+provider = "codex"
+kind = "codex"
+command = "codex"
+timeout_seconds = 120
+auth_check = true
+optional = true
+
+[[runtime.external_cli_providers]]
+provider = "antigravity"
+kind = "antigravity"
+command = "agy"
+timeout_seconds = 120
+auth_check = true
+optional = true
+
+# Generic-command example for other local CLIs:
 #
-# [[runtime.external_cli_providers]]
-# provider = "claude_code"
-# kind = "claude-code"
-# command = "claude"
-# timeout_seconds = 120
-# auth_check = true
-# optional = false
+# provider = "local_llm"
+# kind = "generic-command"
+# command = "my-llm"
+# args = ["--model", "{model}", "--json"]
+# auth_args = ["auth", "status"]
+# response_format = "json" # one of: "text", "json", "jsonl"
+# prompt_transport = "stdin" # use "arg" only when the CLI cannot read stdin
 
 
 # Provider secret backend selection. This table carries selector metadata
@@ -145,17 +168,22 @@ path = "/absolute/path/to/your/workspace/.harness/state.jsonl"
 # REQUIRED for any workflow that dispatches an inference step: the routing
 # manifest must carry at least one fallback chain. Bootstrap stage 3b
 # CP_ROUTING raises `FallbackChainBindError` if `fallback_chains` is empty.
-# The chain below routes to anthropic/claude-haiku-4-5 (matching the shipped
-# examples/minimal.toml). `manifest_version`, `per_role_bindings`,
-# `per_workload_overrides`, and `retry_policies` are all required keys (the
-# RoutingManifest model forbids extras); empty values are fine for the MVP.
+# The chain below routes through local CLI providers first. If a CLI is not
+# installed/authenticated, optional provider construction degrades and the
+# retry/fallback wrapper advances to the next candidate.
 [runtime.routing_manifest]
 manifest_version = 1
 per_role_bindings = {}
 per_workload_overrides = {}
 retry_policies = {}
 fallback_chains = [
-    { primary = { provider = "anthropic", model = "claude-haiku-4-5", family = "anthropic" }, same_family = [], cross_family = [] },
+    { primary = { provider = "claude_code", model = "sonnet", family = "anthropic" }, same_family = [], cross_family = [
+        { provider = "codex", model = "gpt-5", family = "openai" },
+        { provider = "antigravity", model = "Gemini 3.5 Flash (Low)", family = "google" },
+        { provider = "anthropic", model = "claude-haiku-4-5", family = "anthropic" },
+        { provider = "openai", model = "gpt-5", family = "openai" },
+        { provider = "ollama", model = "llama3.2:3b", family = "local_open_weight" },
+    ] },
 ]
 
 

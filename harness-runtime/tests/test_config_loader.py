@@ -52,11 +52,26 @@ def test_kwargs_only_materializes() -> None:
     assert cfg == direct
 
 
-def test_enabled_provider_names_defaults_to_existing_three_providers() -> None:
-    """R-CLI-1 keeps current bootstrap behavior unless operators opt in."""
+def test_enabled_provider_names_defaults_to_cli_first_provider_order() -> None:
+    """OAuth CLI providers are preferred before hosted SDK/API-key providers."""
     cfg = materialize_runtime_config(env={}, **_required_kwargs())
-    assert cfg.enabled_provider_names == ("anthropic", "openai", "ollama")
-    assert cfg.external_cli_providers == ()
+    assert cfg.enabled_provider_names == (
+        "claude_code",
+        "codex",
+        "antigravity",
+        "anthropic",
+        "openai",
+        "ollama",
+    )
+    assert tuple(provider.provider for provider in cfg.external_cli_providers) == (
+        "claude_code",
+        "codex",
+        "antigravity",
+    )
+    assert all(provider.optional for provider in cfg.external_cli_providers)
+    assert cfg.anthropic_optional is True
+    assert cfg.openai_optional is True
+    assert cfg.ollama_optional is True
 
 
 def test_external_cli_provider_config_materializes_from_kwargs() -> None:
@@ -77,6 +92,30 @@ def test_external_cli_provider_config_materializes_from_kwargs() -> None:
     assert cfg.enabled_provider_names == ("claude_code",)
     assert cfg.external_cli_providers[0].provider == "claude_code"
     assert cfg.external_cli_providers[0].command == "claude"
+
+
+def test_external_cli_provider_config_accepts_generic_argv_templates() -> None:
+    """Custom CLI providers can be configured without adding repo code."""
+    cfg = materialize_runtime_config(
+        env={},
+        **_required_kwargs(),
+        enabled_provider_names=("local_llm",),
+        external_cli_providers=(
+            ExternalCLIProviderConfig(
+                provider="local_llm",
+                kind="generic-command",
+                command="my-llm",
+                args=("--model", "{model}", "--json"),
+                auth_args=("auth", "status"),
+                response_format="json",
+            ),
+        ),
+    )
+
+    provider = cfg.external_cli_providers[0]
+    assert provider.args == ("--model", "{model}", "--json")
+    assert provider.auth_args == ("auth", "status")
+    assert provider.response_format == "json"
 
 
 def test_env_supplies_scalar_fields_when_kwargs_omit_them() -> None:

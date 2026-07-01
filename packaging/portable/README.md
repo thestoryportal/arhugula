@@ -12,7 +12,18 @@ uv sync --all-packages
 just init-local
 ```
 
-Then edit `.env` and set `ANTHROPIC_API_KEY` for the shipped minimal workflow.
+Then authenticate at least one local provider CLI as the same OS user that runs
+Arhugula:
+
+```sh
+codex login status
+agy models
+claude auth status --json
+```
+
+Use the CLI's own login/onboarding flow if the status command reports that it is
+not authenticated. API keys in `.env` remain available as secondary SDK
+fallbacks.
 
 Run the smoke workflow:
 

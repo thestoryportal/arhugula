@@ -469,6 +469,37 @@ async def test_fallback_exhausted_emits_and_raises_typed() -> None:
 
 
 @pytest.mark.asyncio
+async def test_fallback_exhausted_surfaces_last_provider_failure_detail() -> None:
+    """The terminal wrapper error preserves the last provider exception detail
+    so an operator can distinguish auth, argv, timeout, and output failures."""
+    primary = _candidate("anthropic", "claude-test-1")
+    chain = _chain(primary)
+    breaker = _retry_breaker_with_llm_policy(max_attempts=1)
+    inner = _MockInnerDispatcher(
+        outcomes=[RuntimeError("gemini CLI exited 1: model not found")]
+    )
+    tp, _ = _tracer_provider_with_exporter()
+    wrapper = RetryBreakerFallbackDispatcher(
+        inner=inner,
+        retry_breaker=breaker,
+        fallback_chain=chain,
+        tracer_provider=tp,
+        sleep_fn=_noop_sleep,
+    )
+
+    with pytest.raises(RetryBreakerFallbackExhaustedError) as exc_info:
+        await wrapper.dispatch(_binding(), _step(), step_context=_step_context())
+
+    assert exc_info.value.last_failure_detail == (
+        "RuntimeError: gemini CLI exited 1: model not found"
+    )
+    assert (
+        "last failure: RuntimeError: gemini CLI exited 1: model not found"
+        in str(exc_info.value)
+    )
+
+
+@pytest.mark.asyncio
 async def test_payload_shape_error_treated_as_fail_fast() -> None:
     """``LLMDispatchPayloadShapeError`` is fail-fast per D2 — the candidate
     is abandoned without consuming the retry budget."""

@@ -88,15 +88,17 @@ clone path. It does not overwrite an existing `.env`.
 
 ## Configure The First Run
 
-Edit `.env`:
+Authenticate at least one local provider CLI:
 
 ```sh
-ANTHROPIC_API_KEY=<your key>
+codex login status
+agy models
+claude auth status --json
 ```
 
-The shipped `examples/minimal.toml` routes to Anthropic
-`claude-haiku-4-5`. For provider-free install verification, skip the key and run
-only `just check-local`.
+Use the CLI's own login/onboarding flow if the status command reports that it is
+not authenticated. Hosted SDK/API keys in `.env` remain available as secondary
+fallbacks. For provider-free install verification, run only `just check-local`.
 
 Run the first workflow:
 

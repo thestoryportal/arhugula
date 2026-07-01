@@ -17,17 +17,19 @@ dispatch — the MVP smoke test.
    `harness.toml` and `.env` files. It preserves existing local files unless
    explicitly forced.
 
-2. **API key.** Edit `.env` and set your Anthropic key:
+2. **Provider auth.** Authenticate at least one local provider CLI as the same
+   OS user that runs Arhugula:
 
    ```sh
-   chmod 600 .env
-   ${EDITOR:-vi} .env
+   codex login status
+   agy models
+   claude auth status --json
    ```
 
-   The `justfile` loads `.env` automatically (`set dotenv-load := true`). The
-   harness resolves the key via ADR-F5 tier-aware keyring with env-var fallback
-   at the `local-development` tier, so the `.env` value is picked up. Secrets
-   are never read from `harness.toml`.
+   Use the CLI's own login/onboarding flow if the status command reports that it
+   is not authenticated. The `justfile` still loads `.env` automatically
+   (`set dotenv-load := true`) so hosted SDK/API keys can be used as secondary
+   fallbacks. Secrets are never read from `harness.toml`.
 
 ## Run the smoke
 
@@ -50,7 +52,9 @@ ledger:    <64-hex audit-ledger head hash>
 
 and writes the state-ledger entries to the `STATE_LEDGER` path bound in
 `harness.toml` (e.g. `<repository_root>/.harness/state.jsonl`). The single
-`inference-step` dispatches a one-token reply ("ok") from `claude-haiku-4-5`.
+`inference-step` dispatches a one-token reply ("ok") from the first available
+provider in the default chain: `claude_code`, `codex`, `antigravity`, then SDK
+fallbacks.
 
 Exit codes: `0` success · `1` workflow failure · `2` manifest error ·
 `3` config error · `4` bootstrap error.
@@ -79,7 +83,7 @@ The expected LLM span is `chat claude-sonnet-4-6`.
 `claude-code.runtime-overlay.toml.example` routes `examples/minimal.toml`
 through an already-authenticated local Claude Code CLI. Arhugula does not read
 or store Claude OAuth/session tokens; it only runs the official `claude` CLI
-with stdin/stdout.
+with stdin/stdout. The easiest path is the temp-config helper:
 
 First verify local CLI auth:
 
@@ -87,17 +91,97 @@ First verify local CLI auth:
 claude auth status --json
 ```
 
-Only run the live example if that reports `"loggedIn": true`. Materialize the
-overlay, then run the existing minimal workflow:
+Only run the live example if that reports `"loggedIn": true`.
 
 ```sh
-CLAUDE_CODE_CONFIG="$(just example-config examples/claude-code.runtime-overlay.toml.example)"
+CLAUDE_CODE_CONFIG="$(just external-cli-config claude_code)"
 uv run harness run examples/minimal.toml --config "$CLAUDE_CODE_CONFIG"
 ```
 
 The expected LLM span is `chat sonnet` with
 `gen_ai.provider.name = "claude_code"` and
 `external_cli.provider.kind = "claude-code"`.
+
+## Route through local Codex
+
+Codex routing uses the already-authenticated local `codex` CLI. Arhugula runs
+`codex login status` at construction and dispatches through
+`codex exec --json --ephemeral --sandbox read-only` with the prompt on stdin.
+
+```sh
+codex login status
+CODEX_CONFIG="$(just external-cli-config codex)"
+uv run harness run examples/minimal.toml --config "$CODEX_CONFIG"
+```
+
+The expected LLM span is `chat gpt-5` with
+`gen_ai.provider.name = "codex"` and `external_cli.provider.kind = "codex"`.
+
+## Route through local Antigravity
+
+Google's replacement for Gemini CLI installs the `agy` binary. Arhugula runs
+`agy models` at construction as a token-free auth check and dispatches through
+`agy --print` with sandboxing enabled:
+
+```sh
+curl -fsSL https://antigravity.google/cli/install.sh | bash
+agy
+```
+
+Complete browser sign-in and first-launch setup in the TUI, then exit and
+verify the authenticated model list:
+
+```sh
+agy models
+ANTIGRAVITY_CONFIG="$(just external-cli-config antigravity)"
+uv run harness run examples/minimal.toml --config "$ANTIGRAVITY_CONFIG"
+```
+
+The expected LLM span is `chat Gemini 3.5 Flash (Low)` with
+`gen_ai.provider.name = "antigravity"` and
+`external_cli.provider.kind = "antigravity"`.
+
+## Route through legacy Gemini
+
+Gemini CLI is deprecated, but Arhugula keeps the adapter for existing legacy
+installs that still have the local `gemini` binary and its headless text prompt
+mode. The adapter passes `--skip-trust` for the current session so a fresh
+checkout does not block on Gemini's folder-trust prompt. It does not read
+token/session files. The default helper config does not run a construction-time
+auth probe because Gemini's non-live auth status surface is not stable across
+installs; the official CLI surfaces auth errors during inference.
+
+```sh
+GEMINI_CONFIG="$(just external-cli-config gemini)"
+uv run harness run examples/minimal.toml --config "$GEMINI_CONFIG"
+```
+
+The expected LLM span is `chat gemini-2.5-flash` with
+`gen_ai.provider.name = "gemini"` and `external_cli.provider.kind = "gemini"`.
+
+## Route through another local CLI
+
+For CLIs without a built-in adapter, generate a temp config with
+`generic-command`. The command is argv-only, no shell is used, and prompts go to
+stdin by default:
+
+```sh
+CUSTOM_CONFIG="$(just external-cli-config generic-command \
+  --provider-name local_llm \
+  --command my-llm \
+  --model demo-model \
+  --family openai \
+  --arg=--model \
+  '--arg={model}' \
+  --arg=--json \
+  --auth-arg=auth \
+  --auth-arg=status \
+  --response-format json)"
+uv run harness run examples/minimal.toml --config "$CUSTOM_CONFIG"
+```
+
+Use `--prompt-transport arg` plus an `--arg='{prompt}'` template only for CLIs
+that cannot read stdin; that can expose prompt text through process argv.
 
 ## Set up local Ollama
 

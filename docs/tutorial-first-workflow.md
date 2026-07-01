@@ -7,9 +7,8 @@ in the repository.
 ## Prerequisites
 
 - Python dependencies are synchronized with `uv`.
-- You have a provider credential for the model selected by
-  `examples/minimal.toml`. The shipped example and `harness.toml.example`
-  route to Anthropic `claude-haiku-4-5`.
+- You have authenticated at least one local provider CLI: `claude`, `codex`, or
+  `agy`. The shipped `harness.toml.example` routes through those CLIs first.
 - You can edit a local, gitignored `harness.toml`.
 
 ## 1. Create Local Config
@@ -32,19 +31,20 @@ The runtime config loader composes environment values, the config file, and CLI
 overrides in deterministic order. `harness.toml` is for selectors and paths, not
 secret values.
 
-## 2. Provide The Provider Credential
+## 2. Authenticate A Provider CLI
 
-For local development, the example guide uses a repo-local `.env` loaded by the
-`justfile`:
+For local development, authenticate one of the local CLIs as the same OS user
+that runs Arhugula:
 
 ```sh
-cp .env.example .env
-chmod 600 .env
+codex login status
+agy models
+claude auth status --json
 ```
 
-Set `ANTHROPIC_API_KEY` in `.env`. The runtime resolves provider secrets through
-the configured tier-aware provider-secret backend; `harness.toml.example` keeps
-secret values out of the TOML file.
+Use the CLI's own login/onboarding flow if the status command reports that it is
+not authenticated. Arhugula stores no OAuth/session tokens in `harness.toml`.
+Hosted SDK/API-key providers remain in the default chain after the OAuth CLIs.
 
 ## 3. Run The Minimal Workflow
 

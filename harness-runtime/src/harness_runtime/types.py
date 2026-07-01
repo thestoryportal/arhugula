@@ -185,6 +185,8 @@ if TYPE_CHECKING:
     from harness_od.audit_ledger_types import AuditLedgerEntry
 
 __all__ = [
+    "DEFAULT_ENABLED_PROVIDER_NAMES",
+    "DEFAULT_EXTERNAL_CLI_PROVIDERS",
     "AuditLedgerWriter",
     "BootstrapStage",
     "ClientName",
@@ -193,8 +195,10 @@ __all__ = [
     "ContentAddressedIndex",
     "CostAttributionChain",
     "EngineSelector",
+    "ExternalCLIPromptTransport",
     "ExternalCLIProviderConfig",
     "ExternalCLIProviderKind",
+    "ExternalCLIResponseFormat",
     "HITLPlacementRegistry",
     "HandoffRegistry",
     "HarnessContext",
@@ -1250,6 +1254,25 @@ class ExternalCLIProviderKind(StrEnum):
     """Supported subscription-backed local CLI provider adapters."""
 
     CLAUDE_CODE = "claude-code"
+    CODEX = "codex"
+    ANTIGRAVITY = "antigravity"
+    GEMINI = "gemini"
+    GENERIC_COMMAND = "generic-command"
+
+
+class ExternalCLIResponseFormat(StrEnum):
+    """How a local CLI writes its final text response to stdout."""
+
+    TEXT = "text"
+    JSON = "json"
+    JSONL = "jsonl"
+
+
+class ExternalCLIPromptTransport(StrEnum):
+    """How the adapter passes the prompt to the local CLI process."""
+
+    STDIN = "stdin"
+    ARG = "arg"
 
 
 class ExternalCLIProviderConfig(BaseModel):
@@ -1265,10 +1288,22 @@ class ExternalCLIProviderConfig(BaseModel):
     """Provider key used by routing, for example ``"claude_code"``."""
 
     kind: ExternalCLIProviderKind
-    """Adapter implementation kind. R-CLI-1 v1 supports ``"claude-code"``."""
+    """Adapter implementation kind."""
 
     command: str = "claude"
     """Executable name/path passed as argv[0] to create_subprocess_exec."""
+
+    args: tuple[str, ...] = ()
+    """Generic-command inference argv suffix. Supports ``{model}`` and ``{prompt}``."""
+
+    auth_args: tuple[str, ...] = ()
+    """Optional generic-command auth/status argv suffix."""
+
+    response_format: ExternalCLIResponseFormat = ExternalCLIResponseFormat.TEXT
+    """Stdout response format for generic-command providers."""
+
+    prompt_transport: ExternalCLIPromptTransport = ExternalCLIPromptTransport.STDIN
+    """Prompt passing mode for generic-command providers."""
 
     timeout_seconds: float = 120.0
     """Per-process timeout for auth checks and inference calls."""
@@ -1285,7 +1320,22 @@ class ExternalCLIProviderConfig(BaseModel):
         stripped = value.strip()
         if not stripped:
             raise ValueError("must be a non-empty string")
+        if "\x00" in stripped:
+            raise ValueError("must not contain NUL bytes")
         return stripped
+
+    @field_validator("args", "auth_args")
+    @classmethod
+    def _clean_argv_items(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        cleaned: list[str] = []
+        for item in value:
+            stripped = item.strip()
+            if not stripped:
+                raise ValueError("argv items must be non-empty strings")
+            if "\x00" in stripped:
+                raise ValueError("argv items must not contain NUL bytes")
+            cleaned.append(stripped)
+        return tuple(cleaned)
 
     @field_validator("timeout_seconds")
     @classmethod
@@ -1293,6 +1343,42 @@ class ExternalCLIProviderConfig(BaseModel):
         if value <= 0:
             raise ValueError("timeout_seconds must be > 0")
         return value
+
+
+DEFAULT_EXTERNAL_CLI_PROVIDERS: tuple[ExternalCLIProviderConfig, ...] = (
+    ExternalCLIProviderConfig(
+        provider="claude_code",
+        kind=ExternalCLIProviderKind.CLAUDE_CODE,
+        command="claude",
+        optional=True,
+    ),
+    ExternalCLIProviderConfig(
+        provider="codex",
+        kind=ExternalCLIProviderKind.CODEX,
+        command="codex",
+        optional=True,
+    ),
+    ExternalCLIProviderConfig(
+        provider="antigravity",
+        kind=ExternalCLIProviderKind.ANTIGRAVITY,
+        command="agy",
+        optional=True,
+    ),
+)
+"""Default OAuth/session-backed local CLI providers.
+
+These carry executable metadata only. Each CLI owns its own local auth/session
+store, and ``optional=True`` lets clean installs degrade until the operator has
+authenticated one of the CLIs.
+"""
+
+DEFAULT_ENABLED_PROVIDER_NAMES: tuple[str, ...] = (
+    *(provider.provider for provider in DEFAULT_EXTERNAL_CLI_PROVIDERS),
+    "anthropic",
+    "openai",
+    "ollama",
+)
+"""Provider construction default: prefer OAuth CLI providers, keep SDK fallback."""
 
 
 # ----------------------------------------------------------------------------
@@ -1363,21 +1449,21 @@ class RuntimeConfig(BaseModel):
     not a key-allowlist concern. U-RT-17 amendment per advisor.
     """
 
-    ollama_optional: bool = False
+    ollama_optional: bool = True
     """If True, Ollama unreachability at stage 3a → `RT-FAIL-PROVIDER-DEGRADED`
-    (typed warning; stage continues with 2-provider context). Default False:
-    Ollama unreachability is a hard stage 3a failure per the multi-LLM
-    commitment (ADR-F1 v1.2). U-RT-19 wires the degraded branch; field is
-    declared here at U-RT-17 to keep schema additions in one commit."""
+    (typed warning; stage continues without the Ollama provider). Default True:
+    Ollama unreachability does not block OAuth CLI providers. U-RT-19 wires
+    the degraded branch; field is declared here at U-RT-17 to keep schema
+    additions in one commit."""
 
-    anthropic_optional: bool = False
+    anthropic_optional: bool = True
     """If True, Anthropic construction failure at stage 3a (keyring miss OR
     network unreachable) → `RT-FAIL-PROVIDER-DEGRADED` (typed warning; stage
-    continues without `"anthropic"` in providers). Default False: Anthropic
-    failure is a hard stage 3a failure per the multi-LLM commitment
-    (ADR-F1 v1.2). Auth errors (`ProviderAuthError` — 401/403) ALWAYS surface
-    regardless of `anthropic_optional` because they indicate operator intent
-    + misconfig (keyring entry present but invalid).
+    continues without `"anthropic"` in providers). Default True: missing API
+    credentials do not block OAuth CLI providers. Auth errors
+    (`ProviderAuthError` — 401/403) ALWAYS surface regardless of
+    `anthropic_optional` because they indicate operator intent + misconfig
+    (keyring entry present but invalid).
 
     Added per `.harness/class_1_fork_provider_construction_allowlist_semantic.md`
     operator-ratified 2026-05-28 (E-prod-3). Symmetric extension of the
@@ -1385,27 +1471,28 @@ class RuntimeConfig(BaseModel):
     Unblocks daemon-mode subprocess e2e for operators without all keyring
     entries configured."""
 
-    openai_optional: bool = False
+    openai_optional: bool = True
     """If True, OpenAI construction failure at stage 3a (keyring miss OR
     network unreachable) → `RT-FAIL-PROVIDER-DEGRADED` (typed warning; stage
-    continues without `"openai"` in providers). Default False: OpenAI
-    failure is a hard stage 3a failure per the multi-LLM commitment
-    (ADR-F1 v1.2). Auth errors (`ProviderAuthError` — 401/403) ALWAYS surface
-    regardless of `openai_optional`.
+    continues without `"openai"` in providers). Default True: missing API
+    credentials do not block OAuth CLI providers. Auth errors
+    (`ProviderAuthError` — 401/403) ALWAYS surface regardless of
+    `openai_optional`.
 
     Added per `.harness/class_1_fork_provider_construction_allowlist_semantic.md`
     operator-ratified 2026-05-28 (E-prod-3). Symmetric extension of the
     `ollama_optional` precedent."""
 
-    enabled_provider_names: tuple[str, ...] = ("anthropic", "openai", "ollama")
+    enabled_provider_names: tuple[str, ...] = DEFAULT_ENABLED_PROVIDER_NAMES
     """Provider keys stage 3a should construct.
 
-    Defaults to the existing three built-in providers for backwards-compatible
-    bootstrap behavior. Operators can opt into an external CLI provider by
-    naming its `ExternalCLIProviderConfig.provider` here.
+    Defaults to local OAuth/session-backed CLIs first, followed by hosted
+    SDK/API-key providers as secondary fallback options.
     """
 
-    external_cli_providers: tuple[ExternalCLIProviderConfig, ...] = ()
+    external_cli_providers: tuple[
+        ExternalCLIProviderConfig, ...
+    ] = DEFAULT_EXTERNAL_CLI_PROVIDERS
     """Local CLI-backed provider configs. Contains no secret/token fields."""
 
     inter_step_data_flow: bool = False

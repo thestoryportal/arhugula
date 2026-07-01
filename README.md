@@ -12,7 +12,18 @@ uv sync --all-packages
 just init-local
 ```
 
-Then edit `.env` and set `ANTHROPIC_API_KEY` for the shipped minimal workflow.
+Then authenticate at least one local provider CLI as the same OS user that runs
+Arhugula:
+
+```sh
+codex login status
+agy models
+claude auth status --json
+```
+
+Use the CLI's own login/onboarding flow if the status command reports that it is
+not authenticated. API keys in `.env` remain available as secondary SDK
+fallbacks.
 
 Run the smoke workflow:
 
@@ -22,6 +33,66 @@ just run examples/minimal.toml
 
 The first run writes runtime state to `.harness/state.jsonl` and uses the paths
 created by `just init-local`.
+
+## Common Example Commands
+
+Pin the same minimal workflow to one local CLI provider with a temp config:
+
+```sh
+CODEX_CONFIG="$(just external-cli-config codex)"
+uv run harness run examples/minimal.toml --config "$CODEX_CONFIG"
+```
+
+The same helper supports `claude_code`, `codex`, `antigravity`, legacy
+`gemini`, and `generic-command` for custom argv-only CLIs. Google's
+Antigravity CLI installs the `agy` binary
+(`curl -fsSL https://antigravity.google/cli/install.sh | bash`); authenticate
+it once with `agy`, then route through `agy --print` with:
+
+```sh
+ANTIGRAVITY_CONFIG="$(just external-cli-config antigravity)"
+uv run harness run examples/minimal.toml --config "$ANTIGRAVITY_CONFIG"
+```
+
+Create a temp config from `harness.toml` plus an example runtime overlay. This
+prints the temp config path and does not modify `harness.toml`:
+
+```sh
+SONNET_CONFIG="$(just example-config examples/minimal-routing-model.runtime-routing.toml.example)"
+uv run harness run examples/minimal-routing-model.toml --config "$SONNET_CONFIG"
+```
+
+Set up local Ollama for the Ollama examples:
+
+```sh
+ollama pull llama3.2:3b
+curl -sf http://127.0.0.1:11434/api/tags
+```
+
+Run the local Ollama recovery example:
+
+```sh
+RECOVERY_CONFIG="$(just example-config examples/recovery-ollama-fallback.runtime-overlay.toml.example)"
+env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY \
+  PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring \
+  uv run harness run examples/recovery-ollama-fallback.toml --config "$RECOVERY_CONFIG"
+```
+
+Start the local observability stack, then run the topology fan-out example:
+
+```sh
+just r420-self-hosted-stack-up
+TOPOLOGY_CONFIG="$(just example-config examples/topology-parallelization-ollama.runtime-overlay.toml.example)"
+env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY \
+  PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring \
+  uv run harness run examples/topology-parallelization-ollama.toml --config "$TOPOLOGY_CONFIG"
+```
+
+Stop the observability stack:
+
+```sh
+just r420-self-hosted-stack-down
+```
 
 ## What Is Included
 

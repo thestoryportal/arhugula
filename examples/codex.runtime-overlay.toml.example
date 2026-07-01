@@ -1,0 +1,30 @@
+# Paired runtime overlay for routing examples/minimal.toml through Codex CLI.
+#
+# This overlay uses the already-authenticated local `codex` CLI as the provider
+# boundary. It contains no OAuth/session tokens and no hosted API keys; authenticate
+# the CLI itself first and verify with:
+#
+#     codex login status
+#
+# The command should report a logged-in local ChatGPT session before you use this
+# overlay.
+
+[runtime]
+enabled_provider_names = ["codex"]
+
+[[runtime.external_cli_providers]]
+provider = "codex"
+kind = "codex"
+command = "codex"
+timeout_seconds = 120
+auth_check = true
+optional = false
+
+[runtime.routing_manifest]
+manifest_version = 1
+per_role_bindings = {}
+per_workload_overrides = {}
+retry_policies = {}
+fallback_chains = [
+    { primary = { provider = "codex", model = "gpt-5", family = "openai" }, same_family = [], cross_family = [] },
+]
