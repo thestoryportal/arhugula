@@ -44,6 +44,10 @@ must provide:
 | `otel.otlp_endpoint` | OTLP endpoint URL with a scheme. |
 | `default_topology` | Fallback topology when the workflow does not specify one. |
 
+The current runtime exporter uses OTLP gRPC. With the shipped self-hosted stack,
+use `http://127.0.0.1:4317`; the stack also exposes OTLP HTTP on 4318 for probes
+and manual HTTP export.
+
 The template also declares path bindings, provider-secret selector metadata,
 provider optionality flags, and a routing manifest fallback chain. Optional
 runtime features are exposed as explicit `RuntimeConfig` fields and default off

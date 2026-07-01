@@ -37,6 +37,10 @@ new dependencies.
 
 The local self-hosted stack in `deploy/self-hosted-local/` provides OTel
 Collector, Tempo, and Grafana while the harness daemon runs as a host process.
+The collector exposes OTLP gRPC on `127.0.0.1:4317` and OTLP HTTP on
+`127.0.0.1:4318`. The current runtime exporter uses OTLP gRPC, so configs that
+use this stack should set `runtime.otel.otlp_endpoint` to the 4317 receiver;
+4318 remains available for probes and manual HTTP OTLP export.
 
 Static readiness:
 

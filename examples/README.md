@@ -65,3 +65,8 @@ Exit codes: `0` success · `1` workflow failure · `2` manifest error ·
   `path_bindings.raw_entries` to `harness.toml`.
 - **MVP-runnable shape.** Only `(pipeline-automation, single-threaded-linear)`
   with `pure-pattern-no-engine` is materialized end-to-end at the v1 MVP.
+- **Model routing authority.** For the current one-shot dispatch path,
+  `harness.toml`'s `[runtime.routing_manifest].fallback_chains[0]` is the
+  effective model-control surface. A workflow file's `default_model_binding`
+  documents the manifest default, but it does not override a runtime fallback
+  chain that routes the step elsewhere.

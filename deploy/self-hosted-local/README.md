@@ -7,7 +7,9 @@ continues to run as a host process.
 The stack contains:
 
 - OpenTelemetry Collector Contrib, listening on OTLP gRPC `127.0.0.1:4317`
-  and OTLP HTTP `127.0.0.1:4318`
+  and OTLP HTTP `127.0.0.1:4318`. The current runtime exporter uses the
+  gRPC receiver, so runtime config should point to 4317 when using this stack;
+  4318 is useful for probes and manual HTTP OTLP export.
 - Grafana Tempo, receiving traces from the collector over Docker networking
 - Grafana, pre-provisioned with a Tempo data source at `http://tempo:3200`
 

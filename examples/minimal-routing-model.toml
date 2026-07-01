@@ -6,6 +6,13 @@
 #
 # (See examples/README.md for the one-time setup: harness.toml + .env.)
 #
+# Routing note:
+#   * This example changes the manifest's workflow fallback_chain and
+#     default_model_binding to claude-sonnet-4-6. In the current one-shot
+#     runtime path, the dispatched model is still governed by
+#     harness.toml's [runtime.routing_manifest].fallback_chains[0] unless
+#     that runtime fallback chain is changed too.
+#
 # Shape notes:
 #   * workload_class = "pipeline-automation" + topology_pattern =
 #     "single-threaded-linear" are the only (workload, topology) pair the v1

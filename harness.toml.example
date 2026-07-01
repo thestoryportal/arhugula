@@ -78,7 +78,10 @@ keyring_service = "harness"
 # REQUIRED. OTel exporter configuration.
 [runtime.otel]
 # REQUIRED. OTLP endpoint URL; must include a `://` scheme.
-otlp_endpoint = "http://localhost:4318"
+# Current runtime tracing uses the OTLP gRPC exporter. With the shipped
+# self-hosted stack, point runtime config at the collector's gRPC receiver
+# on 4317; 4318 is the collector's OTLP HTTP receiver for probes/manual export.
+otlp_endpoint = "http://127.0.0.1:4317"
 
 # Optional. Override the per-deployment-surface sampler mode. None →
 # defer to `harness_od.sampling_mode.PER_DEPLOYMENT_SURFACE_SAMPLING`.
