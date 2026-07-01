@@ -13,6 +13,8 @@ harness.selfhosted.local.toml
 .harness/*.db-wal
 .harness/*.db-shm
 .harness/engine-recovery-segments/
+routing_manifest/*
+!routing_manifest/.gitkeep
 
 # Python and build artifacts.
 __pycache__/
