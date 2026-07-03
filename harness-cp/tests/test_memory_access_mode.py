@@ -103,7 +103,10 @@ def test_anthropic_selects_native_memory_when_policy_allows() -> None:
             provider="anthropic",
             model="claude-opus-4-7",
             family=ProviderFamily.ANTHROPIC,
-            policy=_policy(native_memory_access=AccessDecision.NATIVE_PROVIDER),
+            policy=_policy(
+                injection_access=AccessDecision.DENY,
+                native_memory_access=AccessDecision.NATIVE_PROVIDER,
+            ),
         )
     )
 
@@ -112,6 +115,31 @@ def test_anthropic_selects_native_memory_when_policy_allows() -> None:
     assert result.ledgerable_denial is False
     assert result.selected_provider == "anthropic"
     assert "native_provider_policy_allowed" in result.decision_trace
+
+
+def test_anthropic_prefers_prompt_packet_before_native_memory_when_both_allowed() -> None:
+    result = select_memory_access_mode(
+        _request(
+            provider="anthropic",
+            model="claude-opus-4-7",
+            family=ProviderFamily.ANTHROPIC,
+            policy=_policy(
+                injection_access=AccessDecision.PROMPT_PACKET,
+                native_memory_access=AccessDecision.NATIVE_PROVIDER,
+            ),
+            capabilities=MemoryProviderCapabilities(
+                provider="anthropic",
+                model="claude-opus-4-7",
+                supports_native_memory=True,
+                supports_standard_memory_tools=False,
+                supports_prompt_extension_packet=True,
+            ),
+        )
+    )
+
+    assert result.access_mode is MemoryAccessMode.PROMPT_EXTENSION_PACKET
+    assert "prompt_packet_policy_allowed" in result.decision_trace
+    assert "native_provider_policy_allowed" not in result.decision_trace
 
 
 def test_native_memory_does_not_require_prompt_injection_access() -> None:

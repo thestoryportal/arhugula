@@ -218,6 +218,7 @@ __all__ = [
     "ProviderSecretsConfig",
     "RetryBreakerRegistry",
     "RuntimeConfig",
+    "RuntimeMemoryConfig",
     "SandboxDispatchTable",
     "SemanticCache",
     "ServerName",
@@ -1382,6 +1383,47 @@ DEFAULT_ENABLED_PROVIDER_NAMES: tuple[str, ...] = (
 
 
 # ----------------------------------------------------------------------------
+# `RuntimeMemoryConfig` — local-first automatic memory substrate config.
+# ----------------------------------------------------------------------------
+class RuntimeMemoryConfig(BaseModel):
+    """Operator surface for the automatic local memory substrate.
+
+    Defaults make local filesystem memory available without extra setup. Remote
+    provider-native storage stays opt-in because it crosses an API/vendor
+    boundary and is lower priority than harness-owned local memory.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    enabled: bool = True
+    """When true, stage 5 binds automatic memory retrieval/tooling."""
+
+    root_path: Path | None = None
+    """Filesystem root for memory data; None resolves to `.harness/memory`."""
+
+    token_budget: int = Field(default=1200, ge=0)
+    """Maximum prompt-extension memory budget per dispatch."""
+
+    capture_run_events: bool = True
+    """Enable automatic run-level episodic capture when the runtime surface supports it."""
+
+    capture_turns: bool = True
+    """Enable automatic per-turn episodic capture when the runtime surface supports it."""
+
+    prompt_packet_enabled: bool = True
+    """Allow prompt-extension packets as the universal local fallback."""
+
+    standard_tools_enabled: bool = True
+    """Allow provider-neutral memory tools when the provider can call tools."""
+
+    native_provider_enabled: bool = False
+    """Allow provider-native remote memory APIs. Disabled by default."""
+
+    policy_id: str = "policy:automatic-local-memory"
+    """Policy id recorded on local memory operations."""
+
+
+# ----------------------------------------------------------------------------
 # `RuntimeConfig` — C-RT-03 v1.1 schema.
 # ----------------------------------------------------------------------------
 class RuntimeConfig(BaseModel):
@@ -1490,9 +1532,7 @@ class RuntimeConfig(BaseModel):
     SDK/API-key providers as secondary fallback options.
     """
 
-    external_cli_providers: tuple[
-        ExternalCLIProviderConfig, ...
-    ] = DEFAULT_EXTERNAL_CLI_PROVIDERS
+    external_cli_providers: tuple[ExternalCLIProviderConfig, ...] = DEFAULT_EXTERNAL_CLI_PROVIDERS
     """Local CLI-backed provider configs. Contains no secret/token fields."""
 
     inter_step_data_flow: bool = False
@@ -1576,6 +1616,15 @@ class RuntimeConfig(BaseModel):
 
     tenant_id: str | None = None
     """Multi-tenant separation key per OD audit-ledger. `None` = single-tenant."""
+
+    memory: RuntimeMemoryConfig = Field(default_factory=RuntimeMemoryConfig)
+    """Automatic local memory substrate settings.
+
+    The default binds a repo-local `.harness/memory` store, derived retrieval
+    index, prompt-extension packet composer, and standard memory-tool executor
+    at bootstrap. Provider-native remote memory remains explicitly opt-in and
+    is selected only after local modes are unavailable.
+    """
 
     persona_tier: PersonaTier = PersonaTier.SOLO_DEVELOPER
     """Per-deployment persona classification per OD spec §C-OD-10 §10.3 + §C-OD-13 §13.1.

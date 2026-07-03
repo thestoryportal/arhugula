@@ -7,9 +7,11 @@ This README explains the portable Arhugula memory layer in two ways:
 - Technical: the modules, functions, data flow, access modes, tool calls, and
   verification commands that make the feature work.
 
-The memory layer is default-off. A workflow that does not opt into memory policy
-continues to run with no memory injection, no memory tool access, and no
-provider-native memory bridge.
+The memory layer is automatic and local-first. A fresh portable init creates
+`.harness/memory`; the first inference bootstrap refreshes the derived retrieval
+index and gives each dispatch a bounded local memory packet. Provider-native
+remote memory, including Anthropic native memory, is disabled by default and is
+the last-priority option when explicitly enabled.
 
 ## Plain-English Overview
 
@@ -31,13 +33,13 @@ policy, scope, redaction state, and access mode. In plain terms, the harness
 asks: is this memory allowed for this run, this workflow, this provider, and
 this operator policy?
 
-The memory layer has three delivery paths:
+The memory layer has three delivery paths, selected in this order:
 
 | Path | Plain meaning | Typical use |
 | --- | --- | --- |
-| Native provider memory | Let a provider that has its own memory API use the canonical harness memory store through an adapter. | Anthropic native memory routes. |
 | Standard memory tools | Give a tool-capable provider neutral tools such as `memory.search` and `memory.read`. | OpenAI-style tool-calling routes. |
 | Prompt extension packet | Add a bounded, read-only memory section to the system prompt. | Providers without native memory or memory tools. |
+| Native provider memory | Let a provider that has its own memory API use the canonical harness memory store through an adapter. | Explicit Anthropic native memory routes. |
 
 If none of those paths is allowed, the run uses `no_memory_access`. That is a
 valid result, not an error.
@@ -59,10 +61,12 @@ The portable runtime package now includes a memory substrate:
 - Redaction, tombstones, retention, promotion, and migration write durable
   memory operation evidence.
 - Provider-free checks are wired into `just check-local`.
+- Fresh local init creates the memory directory layout immediately.
 
 The system does not automatically read secrets, import external CLI memory, or
 run paid provider checks. Live provider and authenticated CLI routes stay behind
-explicit gates.
+explicit gates. Anthropic API-backed remote memory is not required for normal
+memory operation.
 
 ## What Changed For Developers
 
@@ -99,8 +103,10 @@ Canonical record types live in `harness_is.memory_record_envelope`.
 `MemoryPolicyDocument` controls capture, promotion, retrieval, injection,
 native memory, standard tools, review, retention, and redaction.
 
-The default policy is `DEFAULT_DISABLED_MEMORY_POLICY`, which denies memory by
-default. This is compatibility behavior.
+The low-level policy object still has a fail-closed disabled default for callers
+that instantiate it directly. The runtime config now binds an automatic local
+policy by default through `[runtime.memory]`, enabling retrieval, prompt packets,
+standard tools, and summarized capture while leaving native provider memory off.
 
 Important policy decisions:
 

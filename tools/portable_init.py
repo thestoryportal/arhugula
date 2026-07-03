@@ -12,6 +12,19 @@ ROOT = Path(__file__).resolve().parents[1]
 PLACEHOLDER_ROOT = "/absolute/path/to/your/workspace"
 LOCAL_DIRS = (
     ".harness",
+    ".harness/memory",
+    ".harness/memory/episodic",
+    ".harness/memory/procedural",
+    ".harness/memory/procedural/promoted",
+    ".harness/memory/procedural/snapshots",
+    ".harness/memory/semantic",
+    ".harness/memory/semantic/conventions",
+    ".harness/memory/semantic/decisions",
+    ".harness/memory/semantic/facts",
+    ".harness/memory/semantic/failures",
+    ".harness/memory/semantic/preferences",
+    ".harness/memory/semantic/research",
+    ".harness/memory/durable",
     "skills",
     "prompts",
     "routing_manifest",
@@ -93,6 +106,7 @@ def _render(result: InitResult) -> str:
         [
             "next:",
             "- authenticate at least one local CLI: claude, codex, or agy",
+            "- memory is local-first under .harness/memory; no provider-native memory is required",
             "- optionally set API keys for secondary SDK fallback",
             "- run: uv sync --all-packages",
             "- run: just run examples/minimal.toml",

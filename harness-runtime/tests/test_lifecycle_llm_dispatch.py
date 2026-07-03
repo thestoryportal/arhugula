@@ -1145,6 +1145,61 @@ async def test_memory_prompt_packet_injects_openai_leading_system_message() -> N
 
 
 @pytest.mark.asyncio
+async def test_automatic_memory_runtime_composes_prompt_packet_per_dispatch() -> None:
+    """Automatic memory is selected at dispatch time from the current run context."""
+
+    class _FakeAutomaticMemoryRuntime:
+        standard_memory_tool_executor = None
+
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str, str]] = []
+
+        def compose_for_dispatch(
+            self,
+            *,
+            binding: StepEffectiveBinding,
+            fallback_chain: FallbackChain,
+            step: WorkflowStep,
+            step_context: StepExecutionContext,
+        ) -> RuntimeMemoryContext:
+            self.calls.append(
+                (
+                    binding.model_binding.provider,
+                    fallback_chain.primary.provider,
+                    step_context.workflow_id,
+                )
+            )
+            return _prompt_extension_memory_context(provider=binding.model_binding.provider)
+
+    adapter = _OpenAIFakeAdapter(_OpenAIClient())
+    tp, _ = _tracer_provider_with_exporter()
+    memory_runtime = _FakeAutomaticMemoryRuntime()
+    fallback_chain = FallbackChain(
+        primary=ProviderCandidate(
+            provider="openai",
+            model="test-model-1",
+            family=ProviderFamily.OPENAI,
+        ),
+        same_family=(),
+        cross_family=(),
+    )
+    dispatcher = RuntimeLLMDispatcher(
+        providers={"openai": adapter},
+        tracer_provider=tp,
+        memory_runtime=memory_runtime,
+        fallback_chain=fallback_chain,
+    )
+
+    await dispatcher.dispatch(_binding("openai"), _step(), step_context=_step_context())
+
+    msgs = adapter.client.chat.completions.last_kwargs["messages"]  # type: ignore[index]
+    assert msgs[0]["role"] == "system"
+    assert "read-only memory packet" in msgs[0]["content"]
+    assert str(_MEMORY_REF) in msgs[0]["content"]
+    assert memory_runtime.calls == [("openai", "openai", "test-wf")]
+
+
+@pytest.mark.asyncio
 async def test_openai_standard_memory_tool_loop_executes_provider_neutral_tool() -> None:
     """A non-native provider using standard memory tools gets a tool-result turn."""
 

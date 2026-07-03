@@ -33,6 +33,11 @@ from harness_runtime.api import (
     resume,
     run,
 )
+from harness_runtime.automatic_memory import (
+    AutomaticMemoryRuntime,
+    LocalAutomaticMemoryRuntime,
+    materialize_automatic_memory_runtime,
+)
 from harness_runtime.bootstrap import (
     BootstrapFailure,
     BootstrapStageCompleteEvent,
@@ -153,6 +158,7 @@ __all__ = [
     "LIVE_CREDENTIAL_GATES",
     "AccessModeVerificationScenario",
     "AlreadyShutDown",
+    "AutomaticMemoryRuntime",
     "BootstrapFailure",
     "BootstrapStageCompleteEvent",
     "CallbackMemoryMigrationService",
@@ -180,6 +186,7 @@ __all__ = [
     "InvalidWorkflowError",
     "LiveCredentialGate",
     "LoadedCliInstructionSource",
+    "LocalAutomaticMemoryRuntime",
     "MemoryCaptureMode",
     "MemoryCaptureResult",
     "MemoryCaptureStatus",
@@ -237,6 +244,7 @@ __all__ = [
     "WorkflowObject",
     "compose_system_prompt_with_memory_packet",
     "flush_observability",
+    "materialize_automatic_memory_runtime",
     "memory_durability_binding_for",
     "memory_durability_bindings",
     "memory_operation_engine_class_for",

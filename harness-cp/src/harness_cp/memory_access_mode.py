@@ -173,18 +173,6 @@ def select_memory_access_mode(
             reason=MemoryAccessModeDenialReason.POLICY_DENIED,
         )
 
-    if capabilities.supports_native_memory and _policy_allows_native(
-        request.workflow_policy,
-        request.step_policy,
-    ):
-        trace.append("native_provider_policy_allowed")
-        return _selected(
-            request,
-            trace=trace,
-            external_cli_route_ref=external_route_ref,
-            access_mode=MemoryAccessMode.NATIVE_PROVIDER_MEMORY,
-        )
-
     if capabilities.supports_standard_memory_tools and _policy_allows_standard_tools(
         request.workflow_policy,
         request.step_policy,
@@ -197,24 +185,41 @@ def select_memory_access_mode(
             access_mode=MemoryAccessMode.STANDARD_MEMORY_TOOLS,
         )
 
+    prompt_denial_reason: MemoryAccessModeDenialReason | None = None
     if capabilities.supports_prompt_extension_packet and _policy_allows_prompt_packet(
         request.workflow_policy,
         request.step_policy,
     ):
         if request.token_budget <= 0:
             trace.append(MemoryAccessModeDenialReason.TOKEN_BUDGET_EMPTY.value)
-            return _denied(
+            prompt_denial_reason = MemoryAccessModeDenialReason.TOKEN_BUDGET_EMPTY
+        else:
+            trace.append("prompt_packet_policy_allowed")
+            return _selected(
                 request,
                 trace=trace,
                 external_cli_route_ref=external_route_ref,
-                reason=MemoryAccessModeDenialReason.TOKEN_BUDGET_EMPTY,
+                access_mode=MemoryAccessMode.PROMPT_EXTENSION_PACKET,
             )
-        trace.append("prompt_packet_policy_allowed")
+
+    if capabilities.supports_native_memory and _policy_allows_native(
+        request.workflow_policy,
+        request.step_policy,
+    ):
+        trace.append("native_provider_policy_allowed")
         return _selected(
             request,
             trace=trace,
             external_cli_route_ref=external_route_ref,
-            access_mode=MemoryAccessMode.PROMPT_EXTENSION_PACKET,
+            access_mode=MemoryAccessMode.NATIVE_PROVIDER_MEMORY,
+        )
+
+    if prompt_denial_reason is not None:
+        return _denied(
+            request,
+            trace=trace,
+            external_cli_route_ref=external_route_ref,
+            reason=prompt_denial_reason,
         )
 
     trace.append(MemoryAccessModeDenialReason.NO_SUPPORTED_MODE.value)

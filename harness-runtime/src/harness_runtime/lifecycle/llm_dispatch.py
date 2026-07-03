@@ -538,6 +538,10 @@ class RuntimeLLMDispatcher:
     # STANDARD_MEMORY_TOOLS for OpenAI, tool-call continuation dispatches
     # memory.* calls through this executor under policy.
     standard_memory_tool_executor: Any = None
+    # Automatic local memory substrate. When bound, each dispatch composes a
+    # fresh memory context from the current model binding and step context.
+    memory_runtime: Any = None
+    fallback_chain: Any = None
     # R-FS-1 arc B4 (§14.5.3) — per-role PROMPT map: branch `AgentRole` → its
     # resolved system-prompt content, pre-resolved at bootstrap stage 0 (where the
     # fail-loud store-membership + binding-tier governance checks fire — before
@@ -961,9 +965,28 @@ class RuntimeLLMDispatcher:
             _effective_system_prompt = self.per_role_system_prompts[_role]
         else:
             _effective_system_prompt = self.active_system_prompt
+        _memory_context = self.memory_context
+        _standard_memory_tool_executor = self.standard_memory_tool_executor
+        if self.memory_runtime is not None:
+            if self.fallback_chain is None:
+                raise LLMDispatchBindError(
+                    "automatic memory runtime requires a fallback_chain binding"
+                )
+            _memory_context = self.memory_runtime.compose_for_dispatch(
+                binding=binding,
+                fallback_chain=self.fallback_chain,
+                step=step,
+                step_context=step_context,
+            )
+            if _standard_memory_tool_executor is None:
+                _standard_memory_tool_executor = getattr(
+                    self.memory_runtime,
+                    "standard_memory_tool_executor",
+                    None,
+                )
         _effective_system_prompt = compose_system_prompt_with_memory_packet(
             _effective_system_prompt,
-            self.memory_context,
+            _memory_context,
         )
 
         # --- R-300 / B-L2-FALLBACK-COMPOSITION: faithful dispatch-read ----------
@@ -1032,6 +1055,8 @@ class RuntimeLLMDispatcher:
                 binding_rationale=binding_rationale,
                 effective_system_prompt=_effective_system_prompt,
                 upstream_output=_upstream_output,
+                memory_context=_memory_context,
+                standard_memory_tool_executor=_standard_memory_tool_executor,
             )
             raw_response["value"] = response
             # ProviderDispatchResult is structurally required by `infer()` but
@@ -1092,6 +1117,8 @@ class RuntimeLLMDispatcher:
         binding_rationale: str | None = None,
         effective_system_prompt: str | None = None,
         upstream_output: Mapping[str, Any] | None = None,
+        memory_context: RuntimeMemoryContext | None = None,
+        standard_memory_tool_executor: Any = None,
     ) -> Mapping[str, Any]:
         """Provider-SDK dispatch boundary — the injected dispatch callable for
         `infer()` (R-300). Opens the `llm.inference` span (gen_ai.* + routing.*
@@ -1281,16 +1308,16 @@ class RuntimeLLMDispatcher:
                     )
             elif provider_name == "openai":
                 if (
-                    self.standard_memory_tool_executor is not None
-                    and self.memory_context is not None
-                    and self.memory_context.access_mode is MemoryAccessMode.STANDARD_MEMORY_TOOLS
+                    standard_memory_tool_executor is not None
+                    and memory_context is not None
+                    and memory_context.access_mode is MemoryAccessMode.STANDARD_MEMORY_TOOLS
                 ):
                     response, usage_attrs = await _dispatch_openai_with_standard_memory_tools(
                         adapter,
                         model,
                         payload,
-                        memory_context=self.memory_context,
-                        standard_memory_tool_executor=self.standard_memory_tool_executor,
+                        memory_context=memory_context,
+                        standard_memory_tool_executor=standard_memory_tool_executor,
                         step_context=step_context,
                         step_id=step_id,
                         system=effective_system_prompt,
@@ -2280,9 +2307,7 @@ async def _dispatch_external_cli(
     result = await adapter.dispatch_text(model=model, prompt=prompt)
     text = getattr(result, "text", None)
     if not isinstance(text, str):
-        raise LLMDispatchPayloadShapeError(
-            "external CLI provider result missing string text field"
-        )
+        raise LLMDispatchPayloadShapeError("external CLI provider result missing string text field")
     exit_code = getattr(result, "exit_code", 0)
     if not isinstance(exit_code, int):
         exit_code = 0
@@ -2439,6 +2464,8 @@ def materialize_llm_dispatcher_stage(
     active_system_prompt: str | None = None,
     memory_context: RuntimeMemoryContext | None = None,
     standard_memory_tool_executor: Any = None,
+    memory_runtime: Any = None,
+    fallback_chain: Any = None,
     per_role_system_prompts: Mapping[AgentRole, str] | None = None,
     prompt_versions_by_sha: Mapping[str, str] | None = None,
     approved_prompt_version_shas: frozenset[str] = frozenset(),
@@ -2518,6 +2545,8 @@ def materialize_llm_dispatcher_stage(
         active_system_prompt=active_system_prompt,
         memory_context=memory_context,
         standard_memory_tool_executor=standard_memory_tool_executor,
+        memory_runtime=memory_runtime,
+        fallback_chain=fallback_chain,
         per_role_system_prompts=per_role_system_prompts or {},
         prompt_versions_by_sha=prompt_versions_by_sha or {},
         approved_prompt_version_shas=approved_prompt_version_shas,

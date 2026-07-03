@@ -8,11 +8,17 @@ with the [Memory layer README](memory-layer-readme.md).
 
 ## Operator Policy Guide
 
-Memory access is explicit. A workflow that does not opt into a memory access
-mode runs with no memory injection, no memory tool access, and no native
-provider memory bridge. Provider-native memory, standard memory tools, prompt
-packet fallback, and no-access mode are selected through typed access-mode and
-CLI-profile carriers rather than ad hoc prompt text.
+Memory access is automatic and local-first for local harness runs. A fresh
+portable init creates `.harness/memory`; first inference bootstrap rebuilds the
+derived retrieval index when it is missing or stale, and each dispatch gets a
+bounded prompt-extension memory packet. Provider-native memory, standard memory
+tools, prompt packet fallback, and no-access mode are selected through typed
+access-mode and CLI-profile carriers rather than ad hoc prompt text.
+
+The default priority is standard memory tools first, local prompt-extension
+packets second, and provider-native remote memory last. Anthropic native memory
+is disabled by default and becomes eligible only when
+`runtime.memory.native_provider_enabled = true`.
 
 Captured memory starts as scoped, typed records. Episodic observations, semantic
 records, preferences, procedural snapshots, compaction events, migration events,
@@ -44,7 +50,7 @@ The memory substrate is split by responsibility:
 | --- | --- |
 | Record envelopes, paths, policy, retrieval, ledgers, redaction, observability | `harness-is/src` |
 | Access-mode and tool-contract declarations | `harness-cp/src`, `harness-as/src` |
-| Runtime context assembly, standard memory tools, native adapters, compaction, migration, durability | `harness-runtime/src` |
+| Automatic local memory bootstrap, runtime context assembly, standard memory tools, native adapters, compaction, migration, durability | `harness-runtime/src` |
 | Cross-provider verification matrix and live-gate declarations | [memory_verification_suite.py](../harness-runtime/src/harness_runtime/memory_verification_suite.py) |
 | Closeout checklist gate | [memory_closeout_check.py](../tools/memory_closeout_check.py) |
 
