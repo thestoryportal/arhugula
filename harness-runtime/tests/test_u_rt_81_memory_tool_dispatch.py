@@ -354,6 +354,11 @@ async def test_create_emits_memory_operation_span_with_write_kind(
     assert attrs["memory.backend"] == "filesystem"
     assert attrs["memory.bytes_written"] == len(b"hi")
     assert attrs["memory.context_editing_active"] is False
+    assert attrs["memory.operation.name"] == "native_adapter_call"
+    assert attrs["memory.provider"] == "anthropic"
+    assert attrs["memory.model"] == "claude-sonnet-4-5"
+    assert attrs["memory.policy.decision"] == "allowed"
+    assert attrs["memory.record_count"] == 1
     # Audit-floor commitment per AS §14.8 — mutation kind head-sampled at 1.0.
     assert attrs["sampling.head_rate"] == 1.0
 

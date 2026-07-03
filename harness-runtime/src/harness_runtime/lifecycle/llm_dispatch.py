@@ -57,8 +57,10 @@ import json
 from collections.abc import Mapping, Sequence
 from contextvars import ContextVar
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any, Protocol, cast, runtime_checkable
 
+from harness_as.memory_tool_contracts import MemoryToolName
 from harness_core import PersonaTier, WorkloadClass
 from harness_cp.cp_shared_types import (
     ActorIdentity,
@@ -70,6 +72,7 @@ from harness_cp.cp_shared_types import (
 )
 from harness_cp.layer_budget import DEFAULT_LAYER_BUDGETS, LayerBudget
 from harness_cp.layered_routing_strategy import LayerDecisionFn
+from harness_cp.memory_access_mode import MemoryAccessMode
 from harness_cp.per_step_override_evaluator import StepEffectiveBinding
 from harness_cp.persona_engine_hitl_matrix import SynchronyClass
 from harness_cp.routing_core_surface import (
@@ -95,6 +98,15 @@ from harness_runtime.lifecycle.memory_tool_dispatch import (
     derive_context_editing_active,
     execute_with_memory_callbacks,
     step_has_memory_tool,
+)
+from harness_runtime.memory_context import (
+    RuntimeMemoryContext,
+    compose_system_prompt_with_memory_packet,
+)
+from harness_runtime.memory_tool_executor import (
+    MemoryToolExecutionContext,
+    MemoryToolExecutionInputError,
+    MemoryToolExecutionRequest,
 )
 
 
@@ -518,6 +530,14 @@ class RuntimeLLMDispatcher:
     # translate fns (`system=` kwarg for anthropic; leading `role:"system"`
     # message for openai/ollama); `ProviderAgnosticPayload` stays frozen.
     active_system_prompt: str | None = None
+    # U-MEM prompt-extension memory fallback context. When C-MEM selects
+    # PROMPT_EXTENSION_PACKET, the dispatcher renders the packet as read-only
+    # system content and composes it into the existing provider prompt seam.
+    memory_context: RuntimeMemoryContext | None = None
+    # U-MEM provider-neutral standard memory tool executor. When C-MEM selects
+    # STANDARD_MEMORY_TOOLS for OpenAI, tool-call continuation dispatches
+    # memory.* calls through this executor under policy.
+    standard_memory_tool_executor: Any = None
     # R-FS-1 arc B4 (§14.5.3) — per-role PROMPT map: branch `AgentRole` → its
     # resolved system-prompt content, pre-resolved at bootstrap stage 0 (where the
     # fail-loud store-membership + binding-tier governance checks fire — before
@@ -941,6 +961,10 @@ class RuntimeLLMDispatcher:
             _effective_system_prompt = self.per_role_system_prompts[_role]
         else:
             _effective_system_prompt = self.active_system_prompt
+        _effective_system_prompt = compose_system_prompt_with_memory_packet(
+            _effective_system_prompt,
+            self.memory_context,
+        )
 
         # --- R-300 / B-L2-FALLBACK-COMPOSITION: faithful dispatch-read ----------
         # The DECLARATIVE layer decision ECHOES the effective binding
@@ -1256,13 +1280,30 @@ class RuntimeLLMDispatcher:
                         upstream=upstream_output,
                     )
             elif provider_name == "openai":
-                response, usage_attrs = await _dispatch_openai(
-                    adapter,
-                    model,
-                    payload,
-                    system=effective_system_prompt,
-                    upstream=upstream_output,
-                )
+                if (
+                    self.standard_memory_tool_executor is not None
+                    and self.memory_context is not None
+                    and self.memory_context.access_mode is MemoryAccessMode.STANDARD_MEMORY_TOOLS
+                ):
+                    response, usage_attrs = await _dispatch_openai_with_standard_memory_tools(
+                        adapter,
+                        model,
+                        payload,
+                        memory_context=self.memory_context,
+                        standard_memory_tool_executor=self.standard_memory_tool_executor,
+                        step_context=step_context,
+                        step_id=step_id,
+                        system=effective_system_prompt,
+                        upstream=upstream_output,
+                    )
+                else:
+                    response, usage_attrs = await _dispatch_openai(
+                        adapter,
+                        model,
+                        payload,
+                        system=effective_system_prompt,
+                        upstream=upstream_output,
+                    )
                 cache_attrs = None
                 request_attrs = None
             elif provider_name == "ollama":
@@ -2001,7 +2042,55 @@ async def _dispatch_openai(
     """OpenAI provider branch — ``client.chat.completions.create(...)``."""
     kwargs = _payload_to_openai_kwargs(payload, system, upstream)
     response = await adapter.client.chat.completions.create(model=model, **kwargs)
+    return _openai_response_bundle(response)
 
+
+async def _dispatch_openai_with_standard_memory_tools(
+    adapter: Any,
+    model: str,
+    payload: ProviderAgnosticPayload,
+    *,
+    memory_context: RuntimeMemoryContext,
+    standard_memory_tool_executor: Any,
+    step_context: StepExecutionContext,
+    step_id: str,
+    system: str | None = None,
+    upstream: Mapping[str, Any] | None = None,
+    max_iterations: int = 16,
+) -> tuple[Mapping[str, Any], _UsageAttrs]:
+    """OpenAI provider branch with standard memory tool continuation."""
+    kwargs = _payload_to_openai_kwargs(payload, system, upstream)
+    messages = list(kwargs["messages"])
+    kwargs["messages"] = messages
+
+    for _ in range(max_iterations):
+        response = await adapter.client.chat.completions.create(model=model, **kwargs)
+        response_mapping = _response_to_mapping(response)
+        tool_calls = _openai_tool_calls(response_mapping)
+        if not tool_calls:
+            return _openai_response_bundle(response)
+
+        assistant_message = _openai_assistant_message(response_mapping)
+        messages.append(assistant_message)
+        messages.extend(
+            _openai_memory_tool_result_message(
+                call,
+                standard_memory_tool_executor=standard_memory_tool_executor,
+                memory_context=memory_context,
+                step_context=step_context,
+                step_id=step_id,
+                provider="openai",
+                model=model,
+            )
+            for call in tool_calls
+        )
+
+    raise RuntimeError(
+        f"OpenAI standard memory tool loop exceeded {max_iterations} continuation turns"
+    )
+
+
+def _openai_response_bundle(response: Any) -> tuple[Mapping[str, Any], _UsageAttrs]:
     usage = getattr(response, "usage", None)
     usage_attrs = _UsageAttrs(
         input_tokens=getattr(usage, "prompt_tokens", None),
@@ -2009,6 +2098,143 @@ async def _dispatch_openai(
         response_id=getattr(response, "id", None),
     )
     return (_response_to_mapping(response), usage_attrs)
+
+
+def _openai_assistant_message(response: Mapping[str, Any]) -> dict[str, Any]:
+    message = _openai_first_message(response)
+    return dict(message)
+
+
+def _openai_tool_calls(response: Mapping[str, Any]) -> tuple[Mapping[str, Any], ...]:
+    message = _openai_first_message(response)
+    tool_calls = message.get("tool_calls")
+    if tool_calls is None:
+        return ()
+    if isinstance(tool_calls, str | bytes) or not isinstance(tool_calls, Sequence):
+        raise LLMDispatchPayloadShapeError("OpenAI tool_calls must be a sequence")
+    calls: list[Mapping[str, Any]] = []
+    for item in cast(Sequence[object], tool_calls):
+        if not isinstance(item, Mapping):
+            raise LLMDispatchPayloadShapeError("OpenAI tool_call entries must be mappings")
+        calls.append(cast(Mapping[str, Any], item))
+    return tuple(calls)
+
+
+def _openai_first_message(response: Mapping[str, Any]) -> Mapping[str, Any]:
+    choices = response.get("choices")
+    if isinstance(choices, str | bytes) or not isinstance(choices, Sequence) or not choices:
+        raise LLMDispatchPayloadShapeError("OpenAI response choices missing")
+    first = cast(Sequence[object], choices)[0]
+    if not isinstance(first, Mapping):
+        raise LLMDispatchPayloadShapeError("OpenAI response choice must be a mapping")
+    first_mapping = cast(Mapping[str, object], first)
+    message = first_mapping.get("message")
+    if not isinstance(message, Mapping):
+        raise LLMDispatchPayloadShapeError("OpenAI response choice.message missing")
+    return cast(Mapping[str, Any], message)
+
+
+def _openai_memory_tool_result_message(
+    call: Mapping[str, Any],
+    *,
+    standard_memory_tool_executor: Any,
+    memory_context: RuntimeMemoryContext,
+    step_context: StepExecutionContext,
+    step_id: str,
+    provider: str,
+    model: str,
+) -> dict[str, Any]:
+    tool_call_id = call.get("id")
+    if not isinstance(tool_call_id, str) or not tool_call_id:
+        raise LLMDispatchPayloadShapeError("OpenAI memory tool_call missing string id")
+    tool_name, arguments = _openai_memory_tool_name_and_arguments(call)
+    request = MemoryToolExecutionRequest(
+        tool_name=tool_name,
+        arguments=arguments,
+        context=_standard_memory_tool_context(
+            arguments,
+            memory_context=memory_context,
+            step_context=step_context,
+            step_id=step_id,
+            provider=provider,
+            model=model,
+        ),
+    )
+    result = standard_memory_tool_executor.execute(request)
+    return {
+        "role": "tool",
+        "tool_call_id": tool_call_id,
+        "name": tool_name.value,
+        "content": json.dumps(result, sort_keys=True, separators=(",", ":"), default=str),
+    }
+
+
+def _openai_memory_tool_name_and_arguments(
+    call: Mapping[str, Any],
+) -> tuple[MemoryToolName, dict[str, object]]:
+    function = call.get("function")
+    if not isinstance(function, Mapping):
+        raise LLMDispatchPayloadShapeError("OpenAI memory tool_call.function missing")
+    function_mapping = cast(Mapping[str, object], function)
+    name = function_mapping.get("name")
+    if not isinstance(name, str) or not name:
+        raise LLMDispatchPayloadShapeError("OpenAI memory tool_call.function.name missing")
+    try:
+        tool_name = MemoryToolName(name)
+    except ValueError as exc:
+        raise LLMDispatchPayloadShapeError(
+            f"OpenAI standard memory loop received non-memory tool {name!r}"
+        ) from exc
+    raw_arguments = function_mapping.get("arguments")
+    if isinstance(raw_arguments, str):
+        try:
+            parsed = json.loads(raw_arguments)
+        except json.JSONDecodeError as exc:
+            raise LLMDispatchPayloadShapeError(
+                f"OpenAI memory tool {name!r} arguments are not valid JSON"
+            ) from exc
+        if not isinstance(parsed, Mapping):
+            raise LLMDispatchPayloadShapeError(
+                f"OpenAI memory tool {name!r} arguments must decode to an object"
+            )
+        return (tool_name, dict(cast(Mapping[str, object], parsed)))
+    if isinstance(raw_arguments, Mapping):
+        return (tool_name, dict(cast(Mapping[str, object], raw_arguments)))
+    raise LLMDispatchPayloadShapeError(f"OpenAI memory tool {name!r} arguments missing")
+
+
+def _standard_memory_tool_context(
+    arguments: Mapping[str, object],
+    *,
+    memory_context: RuntimeMemoryContext,
+    step_context: StepExecutionContext,
+    step_id: str,
+    provider: str,
+    model: str,
+) -> MemoryToolExecutionContext:
+    if memory_context.record_scope is None:
+        raise MemoryToolExecutionInputError(
+            "standard memory tool dispatch requires RuntimeMemoryContext.record_scope"
+        )
+    scope_ref = arguments.get("scope_ref")
+    if not isinstance(scope_ref, str) or not scope_ref:
+        raise MemoryToolExecutionInputError("standard memory tool call requires scope_ref")
+    token_budget = memory_context.packet.token_budget if memory_context.packet is not None else 0
+    return MemoryToolExecutionContext(
+        run_id=memory_context.run_id,
+        workflow_id=step_context.workflow_id,
+        workload_class=None,
+        step_id=step_id,
+        provider=provider,
+        model=model,
+        cli_profile=memory_context.selection.cli_profile_ref,
+        scope=memory_context.record_scope,
+        scope_ref=scope_ref,
+        policy_ref=memory_context.policy_ref,
+        token_budget=token_budget,
+        timestamp=datetime.now(UTC),
+        actor=step_context.parent_actor,
+    )
 
 
 async def _dispatch_ollama(
@@ -2211,6 +2437,8 @@ def materialize_llm_dispatcher_stage(
     workload_class: WorkloadClass | None = None,
     persona_tier: PersonaTier | None = None,
     active_system_prompt: str | None = None,
+    memory_context: RuntimeMemoryContext | None = None,
+    standard_memory_tool_executor: Any = None,
     per_role_system_prompts: Mapping[AgentRole, str] | None = None,
     prompt_versions_by_sha: Mapping[str, str] | None = None,
     approved_prompt_version_shas: frozenset[str] = frozenset(),
@@ -2288,6 +2516,8 @@ def materialize_llm_dispatcher_stage(
         workload_class=workload_class,
         persona_tier=persona_tier,
         active_system_prompt=active_system_prompt,
+        memory_context=memory_context,
+        standard_memory_tool_executor=standard_memory_tool_executor,
         per_role_system_prompts=per_role_system_prompts or {},
         prompt_versions_by_sha=prompt_versions_by_sha or {},
         approved_prompt_version_shas=approved_prompt_version_shas,

@@ -431,6 +431,14 @@ _ALLOWLISTED_CROSS_AXIS_SYMBOLS: frozenset[tuple[str, str]] = frozenset(
         # Composes against the same U-CP-56 → U-IS-07 seam axis (state-ledger
         # read substrate via the §7.4 implementation-discretion clause).
         ("harness_is.state_ledger_read", "BoundedWindow"),
+        # U-MEM access-mode selection consumes existing IS memory
+        # policy/profile/scope carrier records to choose CP-side provider
+        # access posture. These imports classify as convention/runtime carriers,
+        # not new Pattern-P1 byte-exact seam obligations.
+        ("harness_is.cli_profile", "CliProfile"),
+        ("harness_is.memory_policy", "AccessDecision"),
+        ("harness_is.memory_policy", "MemoryPolicyDocument"),
+        ("harness_is.memory_record_envelope", "MemoryScope"),
         # CLASS 3 DRIFT: U-OD-20 → CP `ReplayDisposition` is a genuine typed
         # seam that CXA v2.3 §2.3.6 missed (audit visited only 12 OD→CP
         # rows, all classified convention/runtime). Drift filed at

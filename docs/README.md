@@ -13,6 +13,7 @@ readiness, API/config reference, and architecture.
 | Daily operator or workflow author | [How to operate the runtime](how-to-operate-runtime.md) | Use one-shot CLI, daemon mode, admin inspection, and shutdown paths. |
 | Deployment owner | [How to deploy](how-to-deploy.md) | Validate self-hosted, managed-cloud, and image packaging surfaces before live runs. |
 | Maintainer or reviewer | [Reference](reference.md) and [Architecture](architecture.md) | Check public commands, config fields, workflow shape, package layout, and runtime flow. |
+| Memory operator or reviewer | [Memory substrate](memory-substrate.md) | Review memory policy, architecture, migration posture, and live gates. |
 
 ## Public Surfaces Covered
 
@@ -27,6 +28,7 @@ readiness, API/config reference, and architecture.
 | Managed-cloud readiness | [How to deploy](how-to-deploy.md) |
 | Runtime image packaging | [How to deploy](how-to-deploy.md), [Reference](reference.md) |
 | Architecture/API | [Architecture](architecture.md), [Reference](reference.md) |
+| Memory substrate policy and live gates | [Memory substrate](memory-substrate.md) |
 
 ## Source Grounding
 
@@ -35,4 +37,6 @@ guide, deployment runbooks, portable package manifest, and local init tooling:
 `harness-runtime`, `examples/README.md`, `harness.toml.example`,
 `deploy/self-hosted-local/README.md`, `deploy/managed-cloud/README.md`,
 `deploy/images/README.md`, `packaging/portable-source.toml`,
-`tools/portable_source_package.py`, and `tools/portable_init.py`.
+`tools/portable_source_package.py`, `tools/portable_init.py`,
+`docs/memory-substrate.md`, `tools/memory_closeout_check.py`, and
+`harness-runtime/src/harness_runtime/memory_verification_suite.py`.
