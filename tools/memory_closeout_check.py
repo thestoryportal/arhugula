@@ -12,6 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MEMORY_DOC = Path("docs/memory-substrate.md")
+MEMORY_README = Path("docs/memory-layer-readme.md")
 DOCS_INDEX = Path("docs/README.md")
 MATRIX_SOURCE = Path("harness-runtime/src/harness_runtime/memory_verification_suite.py")
 JUSTFILE = Path("justfile")
@@ -130,6 +131,7 @@ def validate_markdown_links(root: Path, paths: tuple[Path, ...]) -> None:
 def _required_files_check(root: Path) -> CheckResult:
     required = (
         MEMORY_DOC,
+        MEMORY_README,
         DOCS_INDEX,
         MATRIX_SOURCE,
         JUSTFILE,
@@ -147,11 +149,11 @@ def _docs_index_check(root: Path) -> CheckResult:
     missing: list[str] = []
     for path in (DOCS_INDEX, PORTABLE_DOCS_INDEX):
         content = _read(root / path)
-        if "memory-substrate.md" not in content:
+        if "memory-substrate.md" not in content or "memory-layer-readme.md" not in content:
             missing.append(path.as_posix())
     if missing:
-        return _fail("docs-index", f"missing memory-substrate.md links: {missing}")
-    return _ok("docs-index", "docs indexes link to docs/memory-substrate.md")
+        return _fail("docs-index", f"missing memory documentation links: {missing}")
+    return _ok("docs-index", "docs indexes link to memory README and substrate guide")
 
 
 def _memory_doc_sections_check(root: Path) -> CheckResult:
@@ -168,6 +170,23 @@ def _memory_doc_sections_check(root: Path) -> CheckResult:
     return _ok(
         "memory-doc-sections", "operator, maintainer, migration, and grounding sections present"
     )
+
+
+def _memory_readme_sections_check(root: Path) -> CheckResult:
+    content = _read(root / MEMORY_README)
+    required_sections = (
+        "## Plain-English Overview",
+        "## What Changed For Developers",
+        "## End-To-End Workflow",
+        "## Operator Usage",
+        "## Developer Usage",
+        "## Safety Model",
+        "## Troubleshooting",
+    )
+    missing = [section for section in required_sections if section not in content]
+    if missing:
+        return _fail("memory-readme-sections", f"missing sections: {missing}")
+    return _ok("memory-readme-sections", "plain-language and technical README sections present")
 
 
 def _matrix_tokens_check(root: Path) -> CheckResult:
@@ -190,6 +209,7 @@ def _portable_recipe_check(root: Path) -> CheckResult:
     manifest = _read(root / PORTABLE_SOURCE)
     for token in (
         "docs/memory-substrate.md",
+        "docs/memory-layer-readme.md",
         "tools/memory_closeout_check.py",
         "tools/test_memory_closeout_check.py",
     ):
@@ -202,7 +222,7 @@ def _portable_recipe_check(root: Path) -> CheckResult:
 
 def _markdown_links_check(root: Path) -> CheckResult:
     try:
-        validate_markdown_links(root, (DOCS_INDEX, MEMORY_DOC))
+        validate_markdown_links(root, (DOCS_INDEX, MEMORY_DOC, MEMORY_README))
     except AssertionError as exc:
         return _fail("markdown-links", str(exc))
     return _ok("markdown-links", "local markdown links resolve in memory docs")
@@ -213,6 +233,7 @@ def validate(root: Path = ROOT) -> MemoryCloseoutReport:
         _required_files_check(root),
         _docs_index_check(root),
         _memory_doc_sections_check(root),
+        _memory_readme_sections_check(root),
         _matrix_tokens_check(root),
         _portable_recipe_check(root),
         _markdown_links_check(root),

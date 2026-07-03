@@ -3,7 +3,8 @@
 This page is the portable operator and maintainer guide for the memory
 substrate. It summarizes the policy surface, runtime architecture, migration
 posture, and C-MEM-20 verification matrix without running live provider or
-external CLI calls.
+external CLI calls. For a broader feature, workflow, and usage overview, start
+with the [Memory layer README](memory-layer-readme.md).
 
 ## Operator Policy Guide
 
@@ -83,6 +84,7 @@ Portable grounding sources:
 
 - Runtime memory modules under `harness-is/src`, `harness-cp/src`,
   `harness-as/src`, and `harness-runtime/src`.
+- [memory-layer-readme.md](memory-layer-readme.md).
 - [memory_verification_suite.py](../harness-runtime/src/harness_runtime/memory_verification_suite.py).
 - [memory_closeout_check.py](../tools/memory_closeout_check.py).
 

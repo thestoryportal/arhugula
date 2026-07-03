@@ -72,6 +72,7 @@ required_target_paths = [
   "harness-runtime",
   "examples/minimal.toml",
   "docs/portable-install.md",
+  "docs/memory-layer-readme.md",
   "tools/portable_init.py",
   "tools/portable_source_package.py",
   "tools/memory_closeout_check.py",

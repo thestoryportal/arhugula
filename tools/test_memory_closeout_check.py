@@ -64,14 +64,19 @@ def test_memory_docs_are_operator_discoverable_and_source_grounded() -> None:
     docs_index = ROOT / "docs" / "README.md"
     portable_docs_index = ROOT / "packaging" / "portable" / "docs-README.md"
     memory_doc = ROOT / "docs" / "memory-substrate.md"
+    memory_readme = ROOT / "docs" / "memory-layer-readme.md"
 
     assert "memory-substrate.md" in docs_index.read_text(encoding="utf-8")
+    assert "memory-layer-readme.md" in docs_index.read_text(encoding="utf-8")
     assert "memory-substrate.md" in portable_docs_index.read_text(encoding="utf-8")
+    assert "memory-layer-readme.md" in portable_docs_index.read_text(encoding="utf-8")
     assert memory_doc.is_file()
+    assert memory_readme.is_file()
     checker.validate_markdown_links(
         ROOT,
         (
             Path("docs/README.md"),
             Path("docs/memory-substrate.md"),
+            Path("docs/memory-layer-readme.md"),
         ),
     )
