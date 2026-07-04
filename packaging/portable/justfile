@@ -24,7 +24,11 @@ lint:
 typecheck:
     uv run pyright
 
-check-local: sync lint typecheck test
+# Provider-free memory substrate docs and verification-matrix closeout.
+memory-closeout-check:
+    uv run python tools/memory_closeout_check.py --check
+
+check-local: sync lint typecheck memory-closeout-check test
 
 # One-shot workflow run. Example: just run examples/minimal.toml
 run file:

@@ -30,6 +30,7 @@ from harness_cp.hitl_placement import HITLPlacementKind
 from harness_cp.workflow_driver_types import StepKind
 from harness_od.audit_ledger_types import SignatureAlgorithm
 
+from harness_runtime.automatic_memory import materialize_automatic_memory_runtime
 from harness_runtime.bootstrap.factories.managed_agents_dispatcher_factory import (
     materialize_managed_agents_dispatcher_stage,
 )
@@ -281,7 +282,13 @@ async def execute(
     # (StepKindDispatcherNotBoundError backstop). Keeps the non-optional
     # C-RT-04 carrier fields + `_REQUIRED_FIELDS` byte-unchanged.
     bare_dispatcher: Any = _NO_INFERENCE_DISPATCHER
+    automatic_memory_runtime = None
     if ctx.requires_inference:
+        automatic_memory_runtime = materialize_automatic_memory_runtime(
+            config,
+            workload_class=workload_class,
+            tracer_provider=tracer_provider,
+        )
         bare_dispatcher = materialize_llm_dispatcher_stage(
             providers,
             cast(Any, tracer_provider),
@@ -319,6 +326,8 @@ async def execute(
             # bootstrap seam: the dispatcher injects the active prompt as a system
             # prompt at translate-time per runtime spec v1.44 §14.5.
             active_system_prompt=ctx.prompt_manifest.active_prompt_version.content or None,
+            memory_runtime=automatic_memory_runtime,
+            fallback_chain=fallback_chain,
             # R-FS-1 arc B4 (§14.5.3) — the per-role PROMPT injection map resolved
             # at stage 0 (fail-loud there). The dispatcher indexes it per-branch on
             # `step_context.agent_role`; an unbound role falls through to

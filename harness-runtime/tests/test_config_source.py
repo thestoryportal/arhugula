@@ -71,6 +71,47 @@ def test_default_load_returns_runtime_config_pydantic_defaults() -> None:
     assert cfg.step_dispatch_timeout_seconds == 30.0
 
 
+def test_runtime_config_enables_local_memory_by_default() -> None:
+    cfg = RuntimeConfig(**_minimum_required_overrides())
+
+    assert cfg.memory.enabled is True
+    assert cfg.memory.root_path is None
+    assert cfg.memory.token_budget >= 512
+    assert cfg.memory.capture_run_events is True
+    assert cfg.memory.capture_turns is True
+    assert cfg.memory.prompt_packet_enabled is True
+    assert cfg.memory.standard_tools_enabled is True
+    assert cfg.memory.native_provider_enabled is False
+
+
+def test_config_file_runtime_memory_table_loads_operator_overrides(tmp_path: Path) -> None:
+    config_file = tmp_path / "harness.toml"
+    config_file.write_text(
+        "[runtime]\n"
+        'deployment_surface = "local-development"\n'
+        f'repository_root = "{tmp_path}"\n'
+        'default_topology = "single-threaded-linear"\n'
+        "\n"
+        "[runtime.otel]\n"
+        'otlp_endpoint = "http://localhost:4318"\n'
+        "\n"
+        "[runtime.memory]\n"
+        "enabled = true\n"
+        f'root_path = "{tmp_path / "agent-memory"}"\n'
+        "token_budget = 2048\n"
+        "capture_turns = false\n"
+        "native_provider_enabled = true\n",
+        encoding="utf-8",
+    )
+
+    cfg = RuntimeConfigSource.load(config_file=config_file)
+
+    assert cfg.memory.root_path == tmp_path / "agent-memory"
+    assert cfg.memory.token_budget == 2048
+    assert cfg.memory.capture_turns is False
+    assert cfg.memory.native_provider_enabled is True
+
+
 # AC #2 — HARNESS_TENANT_ID → config.tenant_id.
 def test_env_var_supplies_tenant_id(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HARNESS_TENANT_ID", "acme")

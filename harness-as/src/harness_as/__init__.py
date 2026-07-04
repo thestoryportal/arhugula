@@ -97,6 +97,15 @@ from harness_as.gate_level_composition import (
     tier_to_gate_level_floor,
 )
 from harness_as.mcp_transport_floor import mcp_transport_floor, rejects_at_registration
+from harness_as.memory_tool_contracts import (
+    MEMORY_TOOL_CONTRACTS,
+    MemoryToolContract,
+    MemoryToolDurableOperationKind,
+    MemoryToolName,
+    MemoryToolPolicyRequirement,
+    memory_tool_contract,
+    memory_tool_contracts_by_name,
+)
 from harness_as.operator_policy_override_scope import (
     OverrideScopeResult,
     override_scope,
@@ -260,6 +269,7 @@ __all__ = [
     "ENGINE_CLASS_COMPOSITION_OVERLAY",
     "GRACEFUL_DEGRADATION_POLICY",
     "MCP_INVOCATION_ATTRIBUTE_SCHEMA",
+    "MEMORY_TOOL_CONTRACTS",
     "MODEL_BINDING_MATRIX",
     "MODEL_TIER_ESCALATION_CHAIN",
     "PRE_HITL_ESCALATION_ORDER",
@@ -322,6 +332,10 @@ __all__ = [
     "MCPServerTrustLevel",
     "MCPTransport",
     "MechanismClass",
+    "MemoryToolContract",
+    "MemoryToolDurableOperationKind",
+    "MemoryToolName",
+    "MemoryToolPolicyRequirement",
     "MemoryToolStorageBackend",
     "ModelBinding",
     "ModelClass",
@@ -411,6 +425,8 @@ __all__ = [
     "lookup_cell",
     "lookup_cell_with_forcing",
     "mcp_transport_floor",
+    "memory_tool_contract",
+    "memory_tool_contracts_by_name",
     "memory_tool_storage_backend",
     "model_binding",
     "namespace_schema",

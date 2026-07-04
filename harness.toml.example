@@ -102,6 +102,24 @@ optional = true
 # response_format = "json" # one of: "text", "json", "jsonl"
 # prompt_transport = "stdin" # use "arg" only when the CLI cannot read stdin
 
+# Automatic local memory substrate. Defaults are local-first and safe for a
+# fresh checkout: `tools/portable_init.py` creates `<repository_root>/.harness/memory`,
+# first inference bootstrap rebuilds the derived retrieval index, each dispatch
+# gets a bounded prompt packet, and tool-capable providers can use
+# provider-neutral memory tools. Anthropic/provider-native remote memory storage
+# is disabled by default and, even when enabled, is selected only after local
+# standard tools and prompt packets are unavailable.
+[runtime.memory]
+enabled = true
+# root_path = "/absolute/path/to/your/workspace/.harness/memory"
+token_budget = 1200
+capture_run_events = true
+capture_turns = true
+prompt_packet_enabled = true
+standard_tools_enabled = true
+native_provider_enabled = false
+policy_id = "policy:automatic-local-memory"
+
 
 # Provider secret backend selection. This table carries selector metadata
 # only. Do not put API keys, tokens, passwords, or other secret values here.

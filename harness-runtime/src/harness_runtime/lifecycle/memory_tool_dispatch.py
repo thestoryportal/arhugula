@@ -46,6 +46,10 @@ from collections.abc import Mapping, Sequence
 from typing import Any, Final, cast
 
 from harness_as.anthropic_graceful_degradation import MemoryToolStorageBackend
+from harness_is.memory_observability import (
+    MemoryTelemetryOperationName,
+    set_memory_telemetry_attributes,
+)
 
 from harness_runtime.lifecycle.memory_tool_types import (
     MemoryCallbackIOError,
@@ -274,6 +278,7 @@ def _emit_memory_operation_span(
     bytes_read: int | None,
     bytes_written: int | None,
     context_editing_active: bool,
+    model: str | None,
 ) -> Any:
     """Open a `memory.operation` span carrying the AS spec §14.7
     6-attribute namespace.
@@ -295,6 +300,7 @@ def _emit_memory_operation_span(
         bytes_read=bytes_read,
         bytes_written=bytes_written,
         context_editing_active=context_editing_active,
+        model=model,
     )
 
 
@@ -317,6 +323,7 @@ class _MemoryOperationSpanContext:
         bytes_read: int | None,
         bytes_written: int | None,
         context_editing_active: bool,
+        model: str | None,
     ) -> None:
         self._span_cm = span_cm
         self._kind = kind
@@ -325,6 +332,7 @@ class _MemoryOperationSpanContext:
         self._bytes_read = bytes_read
         self._bytes_written = bytes_written
         self._context_editing_active = context_editing_active
+        self._model = model
         self._span: Any = None
 
     def __enter__(self) -> Any:
@@ -338,6 +346,14 @@ class _MemoryOperationSpanContext:
         if self._bytes_written is not None:
             self._span.set_attribute("memory.bytes_written", self._bytes_written)
         self._span.set_attribute("memory.context_editing_active", self._context_editing_active)
+        set_memory_telemetry_attributes(
+            self._span,
+            operation_name=MemoryTelemetryOperationName.NATIVE_ADAPTER_CALL,
+            provider="anthropic",
+            model=self._model,
+            policy_decision="allowed",
+            record_count=1,
+        )
         # Audit-floor commitment per AS spec §14.8 + ADR-D3 §1.8.1 — mutation
         # kinds head-sampled at 1.0. The attribute is read by the OD-side
         # Sampler; the span emission lifecycle here is unaffected.
@@ -464,6 +480,7 @@ async def execute_with_memory_callbacks(
                 bytes_read=None,
                 bytes_written=None,
                 context_editing_active=context_editing_active,
+                model=model,
             )
             with span_ctx:
                 content, bytes_read, bytes_written = await _invoke_protocol_callback(
