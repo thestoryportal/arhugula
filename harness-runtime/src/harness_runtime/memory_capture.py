@@ -527,8 +527,8 @@ class EpisodicMemoryCapture:
             record_count=1,
         ) as span:
             try:
-                self._store.write_record(record)
                 operation_result = self._store.append_memory_operation(payload)
+                self._store.write_record(record)
             except Exception as exc:
                 set_memory_telemetry_attributes(
                     span,

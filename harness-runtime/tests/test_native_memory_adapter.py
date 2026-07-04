@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 from harness_core import DeploymentSurface
@@ -217,6 +218,32 @@ async def test_native_adapter_policy_denies_capture_without_writing(
         await backend.create("/memories/denied.txt", b"secret")
 
     assert store.read_memory_operations() == []
+
+
+@pytest.mark.asyncio
+async def test_native_adapter_does_not_write_record_when_operation_ledger_append_fails(
+    tmp_path: Path,
+) -> None:
+    class _LedgerFailingStore:
+        records_written = 0
+
+        def read_memory_operations(self) -> list[object]:
+            return []
+
+        def append_memory_operation(self, payload: object) -> object:
+            raise OSError("ledger offline")
+
+        def write_record(self, record: object) -> object:
+            self.records_written += 1
+            raise AssertionError("record write must not run before ledger append")
+
+    store = _LedgerFailingStore()
+    _, backend = _backend(tmp_path, store=cast(Any, store))
+
+    with pytest.raises(OSError, match="ledger offline"):
+        await backend.create("/memories/ledger-failure.txt", b"native content")
+
+    assert store.records_written == 0
 
 
 @pytest.mark.asyncio

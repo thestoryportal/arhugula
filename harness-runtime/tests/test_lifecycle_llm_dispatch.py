@@ -938,6 +938,7 @@ def _standard_tools_memory_context(
             cli_profile="codex",
             visibility=MemoryVisibility.WORKFLOW,
         ),
+        scope_ref="scope:u-mem-16",
         external_cli_route_ref=None,
         denial_reason=None,
         ledgerable_denial=False,

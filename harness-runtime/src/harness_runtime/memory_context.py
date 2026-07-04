@@ -6,7 +6,7 @@ import hashlib
 import json
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Protocol, Self
+from typing import Protocol, Self, cast
 
 from harness_cp.cp_shared_types import ModelBinding
 from harness_cp.cross_family_fallback_chain import FallbackChain
@@ -100,6 +100,7 @@ class RuntimeMemoryContext(BaseModel):
     packet_hash: str | None
     retrieval_request_hash: str | None
     record_scope: MemoryScope | None = None
+    scope_ref: str | None = None
     external_cli_route_ref: str | None
     denial_reason: MemoryAccessModeDenialReason | None
     ledgerable_denial: bool
@@ -195,6 +196,7 @@ class RuntimeMemoryContextComposer:
                 packet_hash=None,
                 retrieval_request_hash=None,
                 record_scope=request.record_scope,
+                scope_ref=memory_scope_ref(request.record_scope),
                 external_cli_route_ref=selection.external_cli_route_ref,
                 denial_reason=selection.denial_reason,
                 ledgerable_denial=selection.ledgerable_denial,
@@ -272,6 +274,7 @@ class RuntimeMemoryContextComposer:
             packet_hash=retrieval_result.packet_hash,
             retrieval_request_hash=retrieval_result.request_hash,
             record_scope=request.record_scope,
+            scope_ref=memory_scope_ref(request.record_scope),
             external_cli_route_ref=selection.external_cli_route_ref,
             denial_reason=None,
             ledgerable_denial=False,
@@ -429,6 +432,12 @@ def _retrieval_request(
     )
 
 
+def memory_scope_ref(scope: MemoryScope) -> str:
+    """Return the stable opaque ref exposed to standard memory tools."""
+
+    return f"scope:{_hash_json(cast('dict[str, object]', scope.model_dump(mode='json')))[:32]}"
+
+
 def _injection_event_hash(
     request: MemoryContextCompositionRequest,
     *,
@@ -475,5 +484,6 @@ __all__ = [
     "RuntimeMemoryContext",
     "RuntimeMemoryContextComposer",
     "compose_system_prompt_with_memory_packet",
+    "memory_scope_ref",
     "render_prompt_extension_packet",
 ]

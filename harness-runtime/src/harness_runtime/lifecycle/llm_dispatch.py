@@ -56,11 +56,12 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 from contextvars import ContextVar
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Protocol, cast, runtime_checkable
 
-from harness_as.memory_tool_contracts import MemoryToolName
+from harness_as.memory_tool_contracts import MEMORY_TOOL_CONTRACTS, MemoryToolName
 from harness_core import PersonaTier, WorkloadClass
 from harness_cp.cp_shared_types import (
     ActorIdentity,
@@ -1357,6 +1358,25 @@ class RuntimeLLMDispatcher:
             else:
                 raise LLMDispatchProviderUnreachableError(provider_name)
 
+            if memory_context is not None and self.memory_runtime is not None:
+                capture_turn_completion = getattr(
+                    self.memory_runtime,
+                    "capture_turn_completion",
+                    None,
+                )
+                if callable(capture_turn_completion):
+                    capture_turn_completion(
+                        memory_context=memory_context,
+                        payload=payload,
+                        step_context=step_context,
+                        step_id=step_id,
+                        provider=provider_name,
+                        model=model,
+                        response=response,
+                        input_tokens=usage_attrs.input_tokens,
+                        output_tokens=usage_attrs.output_tokens,
+                    )
+
             # --- Step 4: populate response-side attributes --------------
             _set_if_present(span, "gen_ai.usage.input_tokens", usage_attrs.input_tokens)
             _set_if_present(span, "gen_ai.usage.output_tokens", usage_attrs.output_tokens)
@@ -2087,6 +2107,7 @@ async def _dispatch_openai_with_standard_memory_tools(
 ) -> tuple[Mapping[str, Any], _UsageAttrs]:
     """OpenAI provider branch with standard memory tool continuation."""
     kwargs = _payload_to_openai_kwargs(payload, system, upstream)
+    kwargs["tools"] = _openai_tools_with_standard_memory(kwargs.get("tools"), memory_context)
     messages = list(kwargs["messages"])
     kwargs["messages"] = messages
 
@@ -2243,9 +2264,15 @@ def _standard_memory_tool_context(
         raise MemoryToolExecutionInputError(
             "standard memory tool dispatch requires RuntimeMemoryContext.record_scope"
         )
+    if memory_context.scope_ref is None:
+        raise MemoryToolExecutionInputError(
+            "standard memory tool dispatch requires RuntimeMemoryContext.scope_ref"
+        )
     scope_ref = arguments.get("scope_ref")
     if not isinstance(scope_ref, str) or not scope_ref:
         raise MemoryToolExecutionInputError("standard memory tool call requires scope_ref")
+    if scope_ref != memory_context.scope_ref:
+        raise MemoryToolExecutionInputError("standard memory tool scope_ref does not match context")
     token_budget = memory_context.packet.token_budget if memory_context.packet is not None else 0
     return MemoryToolExecutionContext(
         run_id=memory_context.run_id,
@@ -2256,12 +2283,70 @@ def _standard_memory_tool_context(
         model=model,
         cli_profile=memory_context.selection.cli_profile_ref,
         scope=memory_context.record_scope,
-        scope_ref=scope_ref,
+        scope_ref=memory_context.scope_ref,
         policy_ref=memory_context.policy_ref,
         token_budget=token_budget,
         timestamp=datetime.now(UTC),
         actor=step_context.parent_actor,
     )
+
+
+def _openai_tools_with_standard_memory(
+    existing_tools: object,
+    memory_context: RuntimeMemoryContext,
+) -> list[dict[str, Any]]:
+    memory_tool_names = {entry.tool.value for entry in MEMORY_TOOL_CONTRACTS}
+    preserved: list[dict[str, Any]] = []
+    if isinstance(existing_tools, Sequence) and not isinstance(existing_tools, str | bytes):
+        for tool in cast(Sequence[object], existing_tools):
+            if not isinstance(tool, Mapping):
+                continue
+            tool_mapping = dict(cast(Mapping[str, Any], tool))
+            if _openai_function_tool_name(tool_mapping) in memory_tool_names:
+                continue
+            preserved.append(tool_mapping)
+    return [*preserved, *_openai_standard_memory_tools(memory_context)]
+
+
+def _openai_standard_memory_tools(memory_context: RuntimeMemoryContext) -> list[dict[str, Any]]:
+    if memory_context.scope_ref is None:
+        raise MemoryToolExecutionInputError(
+            "standard memory tool schema injection requires RuntimeMemoryContext.scope_ref"
+    )
+    tools: list[dict[str, Any]] = []
+    for entry in MEMORY_TOOL_CONTRACTS:
+        parameters: dict[str, object] = deepcopy(entry.contract.input_schema)
+        properties = parameters.get("properties")
+        if not isinstance(properties, dict):
+            raise MemoryToolExecutionInputError("memory tool input schema properties missing")
+        schema_properties = cast("dict[str, object]", properties)
+        _bind_schema_fixed_value(schema_properties, "scope_ref", memory_context.scope_ref)
+        _bind_schema_fixed_value(schema_properties, "policy_ref", memory_context.policy_ref)
+        tools.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": entry.contract.name,
+                    "description": entry.contract.description,
+                    "parameters": parameters,
+                },
+            }
+        )
+    return tools
+
+
+def _bind_schema_fixed_value(properties: dict[str, object], name: str, value: str) -> None:
+    if name in properties:
+        properties[name] = {"type": "string", "enum": [value]}
+
+
+def _openai_function_tool_name(tool: Mapping[str, Any]) -> str | None:
+    function = tool.get("function")
+    if not isinstance(function, Mapping):
+        return None
+    function_mapping = cast("Mapping[str, object]", function)
+    name = function_mapping.get("name")
+    return name if isinstance(name, str) else None
 
 
 async def _dispatch_ollama(

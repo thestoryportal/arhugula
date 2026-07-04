@@ -126,6 +126,7 @@ _BOOL: dict[str, object] = {"type": "boolean"}
 _QUERY: dict[str, object] = {"type": "string", "minLength": 1}
 _LIMIT: dict[str, object] = {"type": "integer", "minimum": 1}
 _NOTE: dict[str, object] = {"type": "string", "minLength": 1}
+_TEXT: dict[str, object] = {"type": "string"}
 
 
 MEMORY_TOOL_CONTRACTS: tuple[MemoryToolContract, ...] = (
@@ -133,7 +134,7 @@ MEMORY_TOOL_CONTRACTS: tuple[MemoryToolContract, ...] = (
         tool=MemoryToolName.SEARCH,
         contract=_tool_contract(
             name=MemoryToolName.SEARCH,
-            description="Search eligible memory records and return source-linked refs.",
+            description="Search eligible memory records and return source-linked refs plus text.",
             input_schema=_object_schema(
                 required=("query", "scope_ref", "policy_ref"),
                 properties={
@@ -155,6 +156,7 @@ MEMORY_TOOL_CONTRACTS: tuple[MemoryToolContract, ...] = (
                                 "packet_section_ref",
                                 "packet_hash",
                                 "score",
+                                "text",
                             ),
                             properties={
                                 "memory_ref": _REF,
@@ -162,6 +164,7 @@ MEMORY_TOOL_CONTRACTS: tuple[MemoryToolContract, ...] = (
                                 "packet_section_ref": _REF,
                                 "packet_hash": _HASH,
                                 "score": _SCORE,
+                                "text": _TEXT,
                                 "ranking_trace_ref": _REF,
                             },
                         )
@@ -194,6 +197,7 @@ MEMORY_TOOL_CONTRACTS: tuple[MemoryToolContract, ...] = (
                     "record_kind",
                     "packet_section_ref",
                     "content_hash",
+                    "text",
                     "policy_ref",
                 ),
                 properties={
@@ -201,6 +205,7 @@ MEMORY_TOOL_CONTRACTS: tuple[MemoryToolContract, ...] = (
                     "record_kind": _KIND,
                     "packet_section_ref": _REF,
                     "content_hash": _HASH,
+                    "text": _TEXT,
                     "policy_ref": _REF,
                 },
             ),

@@ -97,17 +97,18 @@ def test_policy_requirements_match_each_memory_tool() -> None:
     )
 
 
-def test_output_schemas_carry_stable_refs_not_untracked_memory_prose() -> None:
-    forbidden_output_fields = {"summary", "text", "content", "prose"}
-
+def test_output_schemas_carry_stable_refs_and_retrieval_text_only_where_needed() -> None:
     for entry in MEMORY_TOOL_CONTRACTS:
         output_schema = entry.contract.output_schema
         field_names = _schema_field_names(output_schema)
-        assert field_names.isdisjoint(forbidden_output_fields)
         assert any(
             field_name.endswith("_ref") or field_name == "memory_ref" for field_name in field_names
         )
         assert "policy_ref" in field_names
+        if entry.tool in {MemoryToolName.SEARCH, MemoryToolName.READ}:
+            assert "text" in field_names
+        else:
+            assert "text" not in field_names
 
 
 def _schema_field_names(schema: object) -> set[str]:

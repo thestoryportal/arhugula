@@ -9,16 +9,18 @@ memory is opt-in and remains the lowest-priority access mode.
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any, Protocol, cast, runtime_checkable
 
 from harness_core import WorkloadClass
+from harness_cp.cp_shared_types import ProviderAgnosticPayload
 from harness_cp.cross_family_fallback_chain import FallbackChain
 from harness_cp.memory_access_mode import reflect_memory_provider_capabilities
 from harness_cp.per_step_override_evaluator import StepEffectiveBinding
 from harness_cp.workflow_driver_types import StepExecutionContext, WorkflowStep
 from harness_is.cli_profile import DEFAULT_GENERIC_CLI_PROFILE
+from harness_is.memory_operation_ledger import MemoryOperationEngineClass
 from harness_is.memory_path_registry import MemoryPathRegistry, MemoryRootBinding
 from harness_is.memory_policy import (
     AccessDecision,
@@ -38,6 +40,14 @@ from harness_is.memory_retrieval_index import (
 )
 from harness_is.memory_store import CanonicalMemoryStore
 
+from harness_runtime.memory_capture import (
+    EpisodicMemoryCapture,
+    MemoryCaptureMode,
+    MemoryCaptureResult,
+    MemoryCaptureStatus,
+    SummaryProvenance,
+    SummarySource,
+)
 from harness_runtime.memory_context import (
     MemoryContextCompositionRequest,
     RuntimeMemoryContext,
@@ -61,6 +71,20 @@ class AutomaticMemoryRuntime(Protocol):
         step: WorkflowStep,
         step_context: StepExecutionContext,
     ) -> RuntimeMemoryContext: ...
+
+    def capture_turn_completion(
+        self,
+        *,
+        memory_context: RuntimeMemoryContext,
+        payload: ProviderAgnosticPayload,
+        step_context: StepExecutionContext,
+        step_id: str,
+        provider: str,
+        model: str,
+        response: Mapping[str, Any],
+        input_tokens: int | None,
+        output_tokens: int | None,
+    ) -> None: ...
 
 
 class AutoRefreshingDerivedRetrievalIndexStore(DerivedRetrievalIndexStore):
@@ -91,6 +115,10 @@ class LocalAutomaticMemoryRuntime:
         self._project = config.repository_root.name
         self._workload_class = workload_class
         self._tenant_id = config.tenant_id
+        self._capture_run_events = config.memory.capture_run_events
+        self._capture_turns = config.memory.capture_turns
+        self._tracer_provider = tracer_provider
+        self._started_runs: set[str] = set()
 
         binding = MemoryRootBinding(default_root=memory_root)
         MemoryPathRegistry(binding).ensure_canonical_roots(self._surface)
@@ -98,6 +126,7 @@ class LocalAutomaticMemoryRuntime:
             root_binding=binding,
             deployment_surface=self._surface,
         )
+        self._store = store
         index_store = AutoRefreshingDerivedRetrievalIndexStore(
             root_binding=binding,
             deployment_surface=self._surface,
@@ -135,7 +164,7 @@ class LocalAutomaticMemoryRuntime:
         step_context: StepExecutionContext,
     ) -> RuntimeMemoryContext:
         model_binding = binding.model_binding
-        return self._composer.compose_run_start(
+        context = self._composer.compose_run_start(
             MemoryContextCompositionRequest(
                 run_id=_run_id(step_context),
                 workflow_id=step_context.workflow_id,
@@ -166,6 +195,110 @@ class LocalAutomaticMemoryRuntime:
                 policy_ref=self._policy.policy_id,
                 provider_capabilities=reflect_memory_provider_capabilities(model_binding),
             )
+        )
+        self._capture_run_start_once(
+            context=context,
+            fallback_chain=fallback_chain,
+            step_context=step_context,
+            engine_class=binding.engine_class,
+        )
+        return context
+
+    def capture_turn_completion(
+        self,
+        *,
+        memory_context: RuntimeMemoryContext,
+        payload: ProviderAgnosticPayload,
+        step_context: StepExecutionContext,
+        step_id: str,
+        provider: str,
+        model: str,
+        response: Mapping[str, Any],
+        input_tokens: int | None,
+        output_tokens: int | None,
+    ) -> None:
+        if not self._capture_turns:
+            return
+        capture_mode = _capture_mode_from_decision(
+            self._policy_resolver.resolve_capture().capture_decision
+        )
+        if capture_mode is None:
+            return
+        result = self._recorder(
+            actor=step_context.parent_actor,
+            scope=memory_context.record_scope,
+            capture_mode=capture_mode,
+        ).capture_turn_completion(
+            run_id=memory_context.run_id,
+            turn_id=_turn_id(memory_context.run_id, step_id, step_context.step_index),
+            step_id=step_id,
+            prompt_summary=_query_summary(_payload_mapping(payload)),
+            response_summary=_response_summary(response),
+            summary=SummaryProvenance(source=SummarySource.HARNESS_RULE),
+            tool_event_refs=(),
+            failure_observations=(),
+            promotion_candidates=(),
+            token_usage=_token_usage(input_tokens=input_tokens, output_tokens=output_tokens),
+            timestamp=datetime.now(UTC),
+            provider=provider,
+            model=model,
+            cli_profile=memory_context.selection.cli_profile_ref,
+            engine_class=_memory_engine_class(step_context.run_engine_class),
+            policy_ref=memory_context.policy_ref,
+            procedural_snapshot_ref=None,
+            capture_mode=capture_mode,
+        )
+        _raise_capture_failure(result)
+
+    def _capture_run_start_once(
+        self,
+        *,
+        context: RuntimeMemoryContext,
+        fallback_chain: FallbackChain,
+        step_context: StepExecutionContext,
+        engine_class: object,
+    ) -> None:
+        if not self._capture_run_events or context.run_id in self._started_runs:
+            return
+        if (
+            _capture_mode_from_decision(self._policy_resolver.resolve_capture().capture_decision)
+            is None
+        ):
+            return
+        result = self._recorder(
+            actor=step_context.parent_actor,
+            scope=context.record_scope,
+            capture_mode=MemoryCaptureMode.SUMMARIZED,
+        ).capture_run_start(
+            run_id=context.run_id,
+            workflow_id=step_context.workflow_id,
+            thread_id=step_context.parent_action_id,
+            provider_route=_provider_route(fallback_chain),
+            timestamp=datetime.now(UTC),
+            provider=context.selection.selected_provider,
+            model=context.selection.selected_model,
+            cli_profile=context.selection.cli_profile_ref,
+            engine_class=_memory_engine_class(engine_class),
+            policy_ref=context.policy_ref,
+            procedural_snapshot_ref=None,
+        )
+        _raise_capture_failure(result)
+        self._started_runs.add(context.run_id)
+
+    def _recorder(
+        self,
+        *,
+        actor: object,
+        scope: MemoryScope | None,
+        capture_mode: MemoryCaptureMode,
+    ) -> EpisodicMemoryCapture:
+        return EpisodicMemoryCapture(
+            store=self._store,
+            actor=cast("Any", actor),
+            project=scope.project if scope is not None else self._project,
+            visibility=scope.visibility if scope is not None else MemoryVisibility.PROJECT,
+            capture_mode=capture_mode,
+            tracer_provider=self._tracer_provider,
         )
 
 
@@ -230,6 +363,10 @@ def _run_id(step_context: StepExecutionContext) -> str:
     return step_context.parent_idempotency_key.replace("/", "_").replace("\\", "_")
 
 
+def _turn_id(run_id: str, step_id: str, step_index: int) -> str:
+    return f"turn:{run_id}:{step_id}:{step_index}"
+
+
 def _query_summary(step_payload: Mapping[str, Any]) -> str:
     messages = step_payload.get("messages")
     if isinstance(messages, list) and messages:
@@ -238,9 +375,98 @@ def _query_summary(step_payload: Mapping[str, Any]) -> str:
     return _compact_json(step_payload)
 
 
+def _payload_mapping(payload: ProviderAgnosticPayload) -> Mapping[str, Any]:
+    return cast("Mapping[str, Any]", payload.model_dump(mode="json"))
+
+
+def _response_summary(response: Mapping[str, Any]) -> str:
+    choices = response.get("choices")
+    if isinstance(choices, Sequence) and not isinstance(choices, str | bytes) and choices:
+        choices_sequence = cast("Sequence[object]", choices)
+        first = choices_sequence[0]
+        if isinstance(first, Mapping):
+            first_mapping = cast("Mapping[str, object]", first)
+            message = first_mapping.get("message")
+            if isinstance(message, Mapping):
+                message_mapping = cast("Mapping[str, object]", message)
+                content = message_mapping.get("content")
+                if isinstance(content, str) and content:
+                    return _compact_text(content)
+                if content is not None:
+                    return _compact_json(content)
+                tool_calls = message_mapping.get("tool_calls")
+                if tool_calls is not None:
+                    return _compact_json(tool_calls)
+    content = response.get("content")
+    if isinstance(content, str) and content:
+        return _compact_text(content)
+    if isinstance(content, Sequence) and not isinstance(content, str | bytes):
+        text_parts: list[str] = []
+        content_sequence = cast("Sequence[object]", content)
+        for item in content_sequence:
+            if isinstance(item, Mapping):
+                item_mapping = cast("Mapping[str, object]", item)
+                text = item_mapping.get("text")
+                if isinstance(text, str):
+                    text_parts.append(text)
+        if text_parts:
+            return _compact_text("\n".join(text_parts))
+    return _compact_json(response)
+
+
+def _token_usage(
+    *,
+    input_tokens: int | None,
+    output_tokens: int | None,
+) -> dict[str, int] | None:
+    usage: dict[str, int] = {}
+    if input_tokens is not None:
+        usage["input_tokens"] = int(input_tokens)
+    if output_tokens is not None:
+        usage["output_tokens"] = int(output_tokens)
+    return usage or None
+
+
+def _provider_route(fallback_chain: FallbackChain) -> tuple[str, ...]:
+    candidates = (
+        fallback_chain.primary,
+        *fallback_chain.same_family,
+        *fallback_chain.cross_family,
+    )
+    return tuple(f"{candidate.provider}:{candidate.model}" for candidate in candidates)
+
+
+def _memory_engine_class(value: object) -> MemoryOperationEngineClass | None:
+    if value is None:
+        return None
+    try:
+        return MemoryOperationEngineClass(str(value))
+    except ValueError:
+        return None
+
+
+def _capture_mode_from_decision(decision: CaptureDecision) -> MemoryCaptureMode | None:
+    if decision is CaptureDecision.DENY:
+        return None
+    if decision is CaptureDecision.CAPTURE_FULL:
+        return MemoryCaptureMode.FULL
+    if decision is CaptureDecision.CAPTURE_REDACTED:
+        return MemoryCaptureMode.REDACTED
+    return MemoryCaptureMode.SUMMARIZED
+
+
+def _raise_capture_failure(result: MemoryCaptureResult) -> None:
+    if result.status is MemoryCaptureStatus.FAILED:
+        raise RuntimeError(result.failure_reason or f"memory capture failed: {result.event_kind}")
+
+
 def _compact_json(value: object) -> str:
     rendered = json.dumps(value, sort_keys=True, default=str, ensure_ascii=False)
-    return rendered[:2000] or "dispatch"
+    return _compact_text(rendered) or "dispatch"
+
+
+def _compact_text(value: str) -> str:
+    return value[:2000]
 
 
 __all__ = [

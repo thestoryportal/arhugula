@@ -240,6 +240,7 @@ def test_search_and_read_return_only_policy_allowed_refs(tmp_path: Path) -> None
     assert result["record_kind"] == MemoryRecordKind.PREFERENCE.value
     assert result["packet_hash"]
     assert result["packet_section_ref"]
+    assert result["text"] == "Codex memory tools may retrieve allowed project workflow preferences."
 
     read = executor.execute(
         _request(
@@ -257,6 +258,7 @@ def test_search_and_read_return_only_policy_allowed_refs(tmp_path: Path) -> None
         "record_kind": MemoryRecordKind.PREFERENCE.value,
         "packet_section_ref": result["packet_section_ref"],
         "content_hash": allowed.envelope.content_hash.hex(),
+        "text": "Codex memory tools may retrieve allowed project workflow preferences.",
         "policy_ref": _POLICY_REF,
     }
     with pytest.raises(MemoryToolExecutionDeniedError):
@@ -373,6 +375,31 @@ def test_write_note_stays_episodic_and_records_capture_and_tool_call(tmp_path: P
     ledger_kinds = [entry.operation_kind for entry in store.read_memory_operations()]
     assert MemoryOperationKind.CAPTURE in ledger_kinds
     assert MemoryOperationKind.STANDARD_TOOL_CALL in ledger_kinds
+
+
+def test_write_note_honors_summarize_only_capture_policy(tmp_path: Path) -> None:
+    store, executor = _executor(
+        tmp_path,
+        policy=_policy(capture_decision=CaptureDecision.SUMMARIZE_ONLY),
+    )
+
+    result = executor.execute(
+        _request(
+            MemoryToolName.WRITE_NOTE,
+            {
+                "note": "Keep only a bounded model-authored note summary.",
+                "scope_ref": _SCOPE_REF,
+                "policy_ref": _POLICY_REF,
+            },
+        )
+    )
+
+    record = store.read_record(
+        MemoryID(str(result["memory_ref"])),
+        MemoryRecordKind.TOOL_EVENT,
+        run_id="run-u-mem-16",
+    )
+    assert record.content["capture_mode"] == "summarized"
 
 
 def test_promotion_and_redaction_requests_create_reviewable_durable_entries(

@@ -12,6 +12,7 @@ from harness_is.memory_operation_ledger import (
     MemoryOperationEngineClass,
     MemoryOperationKind,
     MemoryOperationProjection,
+    MemoryOperationWriteResult,
 )
 from harness_is.memory_path_registry import MemoryRootBinding
 from harness_is.memory_record_envelope import MemoryRecordKind, MemoryTier
@@ -278,16 +279,54 @@ def test_redacted_capture_mode_persists_minimal_content(tmp_path: Path) -> None:
     assert "account 456" not in serialized
 
 
-def test_capture_failure_is_observable() -> None:
-    class _FailingStore:
-        def write_record(self, record: object) -> object:
-            raise OSError("disk full")
+def test_capture_does_not_write_record_when_operation_ledger_append_fails() -> None:
+    class _LedgerFailingStore:
+        records_written = 0
 
         def append_memory_operation(self, payload: object) -> object:
-            raise AssertionError("operation append must not run after record failure")
+            raise OSError("ledger offline")
 
+        def write_record(self, record: object) -> object:
+            self.records_written += 1
+            raise AssertionError("record write must not run before ledger append")
+
+    store = _LedgerFailingStore()
     recorder = EpisodicMemoryCapture(
-        store=_FailingStore(),
+        store=store,
+        actor=Actor(actor_class=ActorClass.AGENT, actor_id="codex"),
+        project="arhugula-v2",
+    )
+
+    result = recorder.capture_run_start(
+        run_id=_RUN_ID,
+        workflow_id="workflow-memory",
+        thread_id="thread-1",
+        provider_route=("openai:gpt-5",),
+        **_common_kwargs(),
+    )
+
+    assert result.status is MemoryCaptureStatus.FAILED
+    assert result.memory_id is None
+    assert result.operation_action_id is None
+    assert result.failure_reason == "OSError: ledger offline"
+    assert store.records_written == 0
+
+
+def test_capture_record_write_failure_after_ledger_append_is_observable() -> None:
+    class _FailingStore:
+        appended = False
+
+        def append_memory_operation(self, payload: object) -> object:
+            self.appended = True
+            return MemoryOperationWriteResult.APPENDED
+
+        def write_record(self, record: object) -> object:
+            assert self.appended is True
+            raise OSError("disk full")
+
+    store = _FailingStore()
+    recorder = EpisodicMemoryCapture(
+        store=store,
         actor=Actor(actor_class=ActorClass.AGENT, actor_id="codex"),
         project="arhugula-v2",
     )
@@ -304,6 +343,7 @@ def test_capture_failure_is_observable() -> None:
     assert result.memory_id is None
     assert result.operation_action_id is None
     assert result.failure_reason == "OSError: disk full"
+    assert store.appended is True
 
 
 def test_module_public_api_is_importable() -> None:

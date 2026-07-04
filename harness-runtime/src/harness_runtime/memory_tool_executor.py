@@ -74,6 +74,8 @@ from harness_runtime.memory_promotion import (
 
 type MemoryToolJSON = str | int | bool | None | list["MemoryToolJSON"] | dict[str, "MemoryToolJSON"]
 
+_MAX_TOOL_TEXT_CHARS = 2_000
+
 
 class MemoryToolExecutionError(Exception):
     """Base class for standard memory tool execution failures."""
@@ -219,6 +221,7 @@ class StandardMemoryToolExecutor:
                     "packet_section_ref": section.section_id,
                     "packet_hash": retrieval.packet_hash,
                     "score": score_by_ref.get(section.memory_ref, 0),
+                    "text": _packet_section_text(section.text, section.memory_ref),
                     "ranking_trace_ref": (
                         f"ranking:{retrieval.request_hash[:32]}:{section.memory_ref}"
                     ),
@@ -248,6 +251,7 @@ class StandardMemoryToolExecutor:
             "record_kind": record.envelope.kind.value,
             "packet_section_ref": packet_section_ref,
             "content_hash": record.envelope.content_hash.hex(),
+            "text": _record_text(record),
             "policy_ref": context.policy_ref,
         }
 
@@ -260,12 +264,13 @@ class StandardMemoryToolExecutor:
         if capture.capture_decision is CaptureDecision.DENY:
             raise MemoryToolExecutionDeniedError("memory capture policy denies write_note")
         note = _string_arg(args, "note")
+        capture_mode = _capture_mode_from_decision(capture.capture_decision)
         capture_api = EpisodicMemoryCapture(
             store=self._store,
             actor=context.actor,
             project=context.scope.project,
             visibility=context.scope.visibility,
-            capture_mode=MemoryCaptureMode.FULL,
+            capture_mode=capture_mode,
         )
         tool_event_id = _tool_event_id(note, _optional_string_arg(args, "idempotency_key"))
         result = capture_api.capture_tool_event(
@@ -282,7 +287,7 @@ class StandardMemoryToolExecutor:
             engine_class=context.engine_class,
             policy_ref=context.policy_ref,
             procedural_snapshot_ref=context.procedural_snapshot_ref,
-            capture_mode=MemoryCaptureMode.FULL,
+            capture_mode=capture_mode,
         )
         if result.status is not MemoryCaptureStatus.CAPTURED or result.memory_id is None:
             raise MemoryToolExecutionError(result.failure_reason or "write_note capture failed")
@@ -683,6 +688,51 @@ def _promotion_statement(source: MemoryStoreRecord) -> str:
         if isinstance(value, str) and value.strip():
             return value
     return f"Memory evidence {source.envelope.memory_id}"
+
+
+def _record_text(record: MemoryStoreRecord) -> str:
+    for key in (
+        "statement",
+        "summary",
+        "response_summary",
+        "prompt_summary",
+        "procedural_update",
+    ):
+        value = record.content.get(key)
+        if isinstance(value, str) and value.strip():
+            return _bounded_text(value)
+    return _bounded_text(
+        json.dumps(
+            _jsonable_mapping(record.content),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+    )
+
+
+def _packet_section_text(text: str, memory_ref: MemoryID) -> str:
+    prefix = f"[{memory_ref}] "
+    if text.startswith(prefix):
+        return _bounded_text(text[len(prefix) :])
+    return _bounded_text(text)
+
+
+def _bounded_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFC", value)
+    if len(normalized) <= _MAX_TOOL_TEXT_CHARS:
+        return normalized
+    return normalized[: _MAX_TOOL_TEXT_CHARS - 3].rstrip() + "..."
+
+
+def _capture_mode_from_decision(decision: CaptureDecision) -> MemoryCaptureMode:
+    if decision is CaptureDecision.CAPTURE_FULL:
+        return MemoryCaptureMode.FULL
+    if decision is CaptureDecision.SUMMARIZE_ONLY:
+        return MemoryCaptureMode.SUMMARIZED
+    if decision is CaptureDecision.CAPTURE_REDACTED:
+        return MemoryCaptureMode.REDACTED
+    raise MemoryToolExecutionDeniedError("memory capture policy denies write_note")
 
 
 def _promotion_risk_flags(source: MemoryStoreRecord) -> tuple[PromotionRiskFlag, ...]:

@@ -121,6 +121,7 @@ class CanonicalNativeMemoryToolBackend:
                     record=state.record,
                     timestamp=self._clock(),
                 )
+                self._emit_native_success_span(validated=validated)
                 return content
         except Exception as exc:
             self._emit_native_failure_span(path=path, exc=exc)
@@ -132,18 +133,12 @@ class CanonicalNativeMemoryToolBackend:
             self._require_native_access()
             self._require_capture_allowed()
             async with self._locks[validated.external_path]:
-                record = self._write_tool_event(
+                self._persist_tool_event(
                     command="create",
                     validated=validated,
                     content=content,
                     deleted=False,
                     prior_state=self._latest_state(validated),
-                )
-                self._append_native_adapter_call(
-                    command="create",
-                    validated=validated,
-                    record=record,
-                    timestamp=record.envelope.created_at,
                 )
         except Exception as exc:
             self._emit_native_failure_span(path=path, exc=exc)
@@ -169,7 +164,7 @@ class CanonicalNativeMemoryToolBackend:
             self._require_native_access()
             self._require_capture_allowed()
             async with self._locks[validated.external_path]:
-                record = self._write_tool_event(
+                record = self._persist_tool_event(
                     command="migrate",
                     validated=validated,
                     content=content,
@@ -177,12 +172,6 @@ class CanonicalNativeMemoryToolBackend:
                     prior_state=self._latest_state(validated),
                     migration_id=migration_id,
                     migration_source_backend=source_backend_name,
-                )
-                self._append_native_adapter_call(
-                    command="migrate",
-                    validated=validated,
-                    record=record,
-                    timestamp=record.envelope.created_at,
                 )
                 return record.envelope.memory_id
         except Exception as exc:
@@ -199,18 +188,12 @@ class CanonicalNativeMemoryToolBackend:
                 if state is None or state.deleted:
                     return
                 self._require_retrieval_allowed(state.record, validated)
-                record = self._write_tool_event(
+                self._persist_tool_event(
                     command="delete",
                     validated=validated,
                     content=None,
                     deleted=True,
                     prior_state=state,
-                )
-                self._append_native_adapter_call(
-                    command="delete",
-                    validated=validated,
-                    record=record,
-                    timestamp=record.envelope.created_at,
                 )
         except Exception as exc:
             self._emit_native_failure_span(path=path, exc=exc)
@@ -230,18 +213,12 @@ class CanonicalNativeMemoryToolBackend:
                         f"str_replace({path!r}): substring {old!r} not found"
                     )
                 replaced = content.replace(old, new).encode(_TEXT_ENCODING)
-                record = self._write_tool_event(
+                self._persist_tool_event(
                     command="str_replace",
                     validated=validated,
                     content=replaced,
                     deleted=False,
                     prior_state=state,
-                )
-                self._append_native_adapter_call(
-                    command="str_replace",
-                    validated=validated,
-                    record=record,
-                    timestamp=record.envelope.created_at,
                 )
         except Exception as exc:
             self._emit_native_failure_span(path=path, exc=exc)
@@ -263,18 +240,12 @@ class CanonicalNativeMemoryToolBackend:
                     )
                 lines.insert(line - 1, content)
                 replaced = "".join(lines).encode(_TEXT_ENCODING)
-                record = self._write_tool_event(
+                self._persist_tool_event(
                     command="insert",
                     validated=validated,
                     content=replaced,
                     deleted=False,
                     prior_state=state,
-                )
-                self._append_native_adapter_call(
-                    command="insert",
-                    validated=validated,
-                    record=record,
-                    timestamp=record.envelope.created_at,
                 )
         except Exception as exc:
             self._emit_native_failure_span(path=path, exc=exc)
@@ -360,7 +331,37 @@ class CanonicalNativeMemoryToolBackend:
         except Exception:
             return None
 
-    def _write_tool_event(
+    def _persist_tool_event(
+        self,
+        *,
+        command: str,
+        validated: _ValidatedMemoryPath,
+        content: bytes | None,
+        deleted: bool,
+        prior_state: _NativeMemoryState | None,
+        migration_id: str | None = None,
+        migration_source_backend: str | None = None,
+    ) -> MemoryStoreRecord:
+        record = self._build_tool_event_record(
+            command=command,
+            validated=validated,
+            content=content,
+            deleted=deleted,
+            prior_state=prior_state,
+            migration_id=migration_id,
+            migration_source_backend=migration_source_backend,
+        )
+        self._append_native_adapter_call(
+            command=command,
+            validated=validated,
+            record=record,
+            timestamp=record.envelope.created_at,
+        )
+        self._store.write_record(record)
+        self._emit_native_success_span(validated=validated)
+        return record
+
+    def _build_tool_event_record(
         self,
         *,
         command: str,
@@ -422,7 +423,6 @@ class CanonicalNativeMemoryToolBackend:
             ),
             content=record_content,
         )
-        self._store.write_record(record)
         return record
 
     def _append_native_adapter_call(
@@ -465,7 +465,6 @@ class CanonicalNativeMemoryToolBackend:
                 procedural_snapshot_ref=self._procedural_snapshot_ref,
             )
         )
-        self._emit_native_success_span(validated=validated)
 
     def _emit_native_success_span(self, *, validated: _ValidatedMemoryPath) -> None:
         with memory_telemetry_span(
