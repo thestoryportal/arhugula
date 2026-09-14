@@ -230,7 +230,15 @@ load-bearing line were deleted or inverted, does this test actually red?* Traps 
 repeatedly: presence-check standing in for behavior (asserting a variable is set, not
 that the writer honors it); a witness that dies before reaching its discriminating
 assertion (KeyError before the emit); a child process that never instantiates the
-thing under test; an assertion after an early return. Where feasible, actually run the
+thing under test; an assertion after an early return; and, in a doc or prose witness, a
+needle on a list marker, heading or label (`- **K5 —`, a bare `checkpoint`) instead of the
+claim text after it — invert the claim, keep the marker, and the test stays green (U-HE-39,
+merge-gate witness lens r1: K5, K7 and K8 of the four K-dispositions pinned only by their bullet). For a
+doc witness the mutation to reason is *negate the sentence*, not *delete the line* — and a
+claim-text needle that stops mid-sentence is the same defect one clause later: pin the WHOLE
+claim, matched against the file with its whitespace flattened so a wrapped sentence is one
+string (U-HE-39 r2: K7's "shadow mode only" clause sat outside a first-half needle). Where
+feasible, actually run the
 mutation probe (`just mutation-probe`) rather than reasoning it — and probe the fix
 BOTH ways (kill confirmed, then green restored).
 
@@ -344,7 +352,11 @@ cheap place to commit it.
 ### 13. A new command the loop must reach (added U-SR-01; u-he-35 r2, one round)
 Class 11 asks what a new verb can AUTHORIZE. This asks the other half: can the loop
 INVOKE it at all? The trigger is mechanical — the diff adds a justfile recipe (or any
-new command shape) whose verification-manifest `runs_in` includes "loop". Answer
+new command shape) whose verification-manifest `runs_in` includes "loop" — and equally a
+diff that CHANGES a documented command shape in a carrier to fix what the command records
+(an added env prefix, flag or argument): that fix is only as durable as the pin on it
+(U-HE-39 witness lens r3: a `HARNESS_LANE_ID=` prefix added to six carrier lines shipped
+unpinned, and the one existing assert matched the command with or without it). Answer
 both halves: is the permission guard wired to auto-allow the EXACT shape the loop
 will type, and does a witness pin that shape so reverting the wiring goes red? The
 precedent commits already model the whole chain — recipe ⇒ guard allow ⇒ witness

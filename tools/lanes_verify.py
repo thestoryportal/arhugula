@@ -460,6 +460,18 @@ MANIFEST: list[Row] = [
     # C-HE-30 (U-HE-14)
     # spec §8.1: mutation-probe `—` (static doc witness; no deletion-expressible target)
     Row("C-HE-30", "pytest:tools/test_store_audit.py", "phase0", "local + CI", False),
+    # C-HE-01/14/21/34/35 (U-HE-39) — skill-carrier doc sweep: N ≥ 2 lane model, the
+    # C-HE-14 table byte-exact, live-carrier invariant cites, non-goals, K5–K8, and the
+    # §8 AC#7 no-numeric-round-cap scan. mutation-probe `—`: markdown skill prose, the
+    # C-HE-30 static-doc-witness precedent; the red run against origin/main's tree is
+    # recorded in the PR body.
+    Row(
+        "C-HE-01/14/21/34/35",
+        "shell:tools/hooks/test_skill_lanes_docs.sh",
+        "phase0",
+        "local + CI",
+        False,
+    ),
     # WR-14 (U-SR-07) — session-shape habit lines at their loop-skill carriers.
     # mutation-probe `—`: the probed artifact is markdown skill prose, outside the
     # probe tool's language set (C-HE-30 static-doc-witness precedent); the manual

@@ -123,16 +123,17 @@ immediately before the
 (`verdict`, `findings`, the six values verbatim). After each run, copy the output file into
 the worktree (`.harness/tmp/merge-gate-lens-<id>.txt`, gitignored); once all three exist,
 record them in ONE call (B-230 Task 5):
-`just merge-gate-emit-all --pr <N> --arc-id <arc-id> --concurrency-json .harness/tmp/merge-gate-lens-concurrency.txt --spec-json .harness/tmp/merge-gate-lens-spec-conformance.txt --witness-json .harness/tmp/merge-gate-lens-witness-adequacy.txt`
+`HARNESS_LANE_ID=<lane-id> just merge-gate-emit-all --pr <N> --arc-id <arc-id> --concurrency-json .harness/tmp/merge-gate-lens-concurrency.txt --spec-json .harness/tmp/merge-gate-lens-spec-conformance.txt --witness-json .harness/tmp/merge-gate-lens-witness-adequacy.txt`
 (`--arc-id` is the RESERVATION id, e.g. `u-he-34` — omitting it defaults the row's `arc_id`
 to `pr-<N>`, which breaks the N6/phase joins AND the U-HE-47 unique-catch join against the
-preceding codex rounds, whose rows carry the reservation arc id).
+preceding codex rounds, whose rows carry the reservation arc id; `<lane-id>` is the
+`.harness/.lane-id` content, without which every row records the `-nolane` fallback).
 It records the three lenses in that order, ALWAYS all three (a recorded BLOCK is a result,
 not an abort), and exits with the worst per-lens code: 0 = APPROVE recorded, 1 = BLOCK
 recorded, 2 = NOT recorded (JSONL row first, structured markdown line second, C-HE-23 §2;
 the final `VERDICT:` line must agree with the block, exact-line match). A lens that exited 2
 does not count — treat it as `BLOCK`, re-run THAT lens, and record it alone with
-`just merge-gate-emit --pr <N> --arc-id <arc-id> --lens <id> --verdict-json .harness/tmp/merge-gate-lens-<id>.txt`
+`HARNESS_LANE_ID=<lane-id> just merge-gate-emit --pr <N> --arc-id <arc-id> --lens <id> --verdict-json .harness/tmp/merge-gate-lens-<id>.txt`
 (never by re-running `emit-all`, which mints a fresh round for the two lenses that were fine;
 there is no resumption — the JSONL is the only record).
 
@@ -152,9 +153,10 @@ there is no resumption — the JSONL is the only record).
   (the prefix is REQUIRED for the guard's auto-allow and holder-bound to this lane's
   live reservation; actor must differ from the lens producer, write-time enforced).
   The `finding_id` is on the emitted JSONL row. Exit 2 = not recorded; re-run.
-- Cap automatic fix/re-gate at ten rounds (operator decision, 2026-08-01). An eleventh
+- Automatic fix/re-gate pauses at a recorded-decision checkpoint every ten rounds (period by
+  operator decision, 2026-08-01; a checkpoint, not a cap, under C-HE-21 §1). An eleventh
   substantive disagreement is a genuine decision point; surface all verdicts together
-  rather than looping or choosing silently.
+  rather than looping or choosing silently, and continue only on a recorded decision.
 
 Commit and push the gate-log row before merge, then wait for CI on that final PR HEAD to be
 green. The log-only commit does not require re-running approved lenses, but any code, test,

@@ -1,12 +1,19 @@
 ---
 name: two-lane
-description: Operator-invoked pilot recipe for running TWO roadmap arcs in parallel worktrees while keeping every merge and every terminating refresh strictly serial through ship-pr. Use when the operator explicitly asks for two lanes ("/two-lane", "run two arcs in parallel", "open a second lane") — it is never auto-selected from roadmap-continue or ship-pr. It is a recipe, not machinery: no spawner, no merge queue, no conflict automation.
+description: Operator-invoked pilot recipe for running two or more (N ≥ 2) roadmap arcs in parallel worktrees while keeping every merge and every terminating refresh strictly serial through ship-pr. Use when the operator explicitly asks for two lanes ("/two-lane", "run two arcs in parallel", "open a second lane") — it is never auto-selected from roadmap-continue or ship-pr. It is a recipe, not machinery: no spawner, no merge queue, no conflict automation.
 ---
 
-# two-lane — two arcs building in parallel, one merging at a time
+# two-lane — N ≥ 2 arcs building in parallel, one merging at a time
 
-Two arcs can be *built* concurrently. They cannot be *landed* concurrently: CLAUDE.md §12.2.1
-gives the merge lane a single fixed point, and every landing has to pass through it in order.
+N ≥ 2 lanes build concurrently in isolated worktrees, each with its own gates and reviewers,
+and land through exactly one merge door, one arc at a time (C-HE-01 §1). Arcs can be *built*
+concurrently; they cannot be *landed* concurrently: CLAUDE.md §12.2.1 gives the merge lane a
+single fixed point, and every landing has to pass through it in order. N is a dial, not a
+constant (C-HE-01 §2). The recipe below walks two lanes, A and B, because the serial rule is
+pairwise: a third lane waits behind B exactly as B waits behind A.
+Throughput: well under N×; merges serialize; trailing lanes re-gate on head change —
+**prior, not measurement** until AC#10 (C-HE-28) produces a baseline. "Four lanes, four times
+the arcs" is exactly the claim this forbids; nothing measured supports it yet.
 This recipe is the whole feature — a discipline written down, running on machinery that already
 exists (`git worktree`, `ship-pr`, `tools/hooks/safe-worktree-remove.sh`). Nothing here is
 automated, deliberately (see the CUTs at the end).
@@ -166,3 +173,26 @@ repeated, described friction, not a hypothetical one; in C-HE-13 §3's terms a `
 appearing in ≥ 2 of the ≥ 3 pilots, or one occurrence the operator rates independently severe.
 `just lanes-pilot-report <run-id>` prints the PASS/FAIL and the friction rows it is judged on.
 Until then this file is the whole feature.
+
+## Rejected and blocked mechanisms (C-HE-14)
+
+The spec's normative "do not build" list, copied byte-exact from C-HE-14 in
+`.harness/spec/Spec_HE_Loop_Lanes_v1.md` — the row cites are the spec's own, as of its
+clearance, not re-verified here. When lanes contend, one of these will look like the obvious
+fix: a lock held across the drain, a small coordinator process, a union merge driver for the
+shared logs. Each was weighed and refused. Building one is a design change that routes to
+design-phase back-flow (CLAUDE.md §4.3), not a lane-level tweak.
+
+| Mechanism | Disposition | Reason |
+|---|---|---|
+| Full-lifetime `flock` across drain | **Rejected** (R-6) | Two remote calls inside the proposed window (`gh_pr` `:284`, `ci_metrics` `:376` **[C]**); auto-releases on death; mechanism-family change |
+| Daemon / coordinator / spawner / merge-queue lock | **Foreclosed** (L-2) | D3 fail-fast exists so no one builds daemon-shaped arbitration unnamed |
+| Local base CAS via raw `PATCH /git/refs` (item 20) | **Blocked, stays blocked** | Squash/ancestry: auto-close never fires and ship-pr aborts on non-`MERGED`; **and** trust boundary: a raw ref PATCH is content-blind (C10). Only the read-only `local-base-cas-check` survives (C-HE-06 step ii) |
+| Integration-lens gate (item 21) | **Blocked** until its contract survives review; when built it MUST route through `just codex-review` on the **merge-tree diff**, not another Claude subagent (v1 AC#6) |
+| `loop_status.d/` fragment split | **Rejected** (P3, R-16) | C-HE-09 |
+| Post-hoc first-parent assertion **instead of** the lease | **Rejected** as a fence (R-8); **kept as a detection** (C-HE-12) | Detect-after-landing |
+| A third durable store for landing state | **Rejected** (L-5, D-B) | `merge_attempted_at` folds into the lease |
+| sqlite as the durable record | **Rejected** (L-5) | New DB+WAL surface, no correctness gain, loses git-diffability |
+| `merge=union` | **Rejected** | git concedes arbitrary line order; `.gitattributes` ties LF forcing to hash-chain determinism |
+| Optimistic stale-base merge (D1(c)) | **Rejected** by every reviewer | Abandons combination testing |
+| Removing `gh pr merge` from the allowlist **without** a wrapper | **Rejected** (R-19) | Superseded by C-HE-07 |

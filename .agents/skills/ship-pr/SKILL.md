@@ -263,8 +263,12 @@ derived metrics frozen, so later edits to those logs cannot change what this arc
 Step 2 -- drain, early in the NEXT arc, before opening its PR:
 
 ```
-just arc-metrics drain
+HARNESS_LANE_ID=<lane-id> just arc-metrics drain
 ```
+
+`<lane-id>` is the persisted `.harness/.lane-id` content, typed as a literal: drain folds a
+`merged` reservation's row only for its holder lane, and a bare call runs under a fallback id,
+so every merged arc stays held.
 
 Folds queued arcs into `.harness/arc-metrics.jsonl`, committed inside that arc's own PR
 (stage the path explicitly; never `git add -A`). `drain` exits NON-ZERO while anything is

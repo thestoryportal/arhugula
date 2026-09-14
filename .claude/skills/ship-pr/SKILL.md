@@ -205,10 +205,11 @@ spec-conformance-against-ledgers, test-witness-adequacy), each returning a struc
 `VERDICT: APPROVE`/`VERDICT: BLOCK: <reason>` line. All-approve → merge without HIL, per
 `[[feedback-merge-without-hil-once-ci-green]]` (CI-green remains the base precondition; this
 gate is an additional one for code-touching PRs, not a replacement). Any block or split
-verdict → do not merge; automatic fix-and-re-gate is capped at ten rounds. An eleventh
-substantive disagreement is the decision point surfaced to the operator via one
-`AskUserQuestion` — see the skill for the full procedure, parse-failure handling, and the
-audit-log append.
+verdict → do not merge; automatic fix-and-re-gate pauses at a recorded-decision checkpoint
+every ten rounds — a checkpoint, never a cap (C-HE-21 §1): an eleventh substantive
+disagreement is the decision point surfaced to the operator via one `AskUserQuestion`, and
+its recorded answer continues review (unbounded) or holds it — see the skill for the full
+procedure, parse-failure handling, and the audit-log append.
 
 **Final-gate reservation back-fill (C-HE-03 §3 + C-HE-06 §4(ii), U-HE-21).** After the
 gate all-approves and BEFORE the merge door: refresh the merge tuple and record the
@@ -638,8 +639,14 @@ cohort split on that field.
 **Step 2 — drain, inside the NEXT arc's PR.** Early in the next arc, before opening its PR:
 
 ```
-just arc-metrics drain
+HARNESS_LANE_ID=<lane-id> just arc-metrics drain
 ```
+
+`<lane-id>` is this lane's persisted id — the content of `.harness/.lane-id` — typed as a
+literal. The prefix is load-bearing: drain folds a `merged` reservation's row only for the
+lane that holds it, and a bare call runs under a fallback lane id, so every merged arc reads
+as another lane's and stays held. 25 arcs' rows sat stranded that way until U-HE-39's
+prefixed drain folded them.
 
 This folds every queued arc into `.harness/arc-metrics.jsonl` as an ordinary tracked change,
 committed inside that arc's own PR (`git add .harness/arc-metrics.jsonl` — never
@@ -660,6 +667,21 @@ Read the folded rows before moving on. `--round-logs` fails closed (zero matched
 aborts rather than recording `0 rounds`), and a `provenance` value beginning `unmapped:`
 means that field had no input — an honest null, not a measured zero. A lever must never be
 evaluated against one.
+
+## Non-goals (C-HE-34)
+
+These are refusals, not gaps. Each will look like a speed fix at the moment an arc is dragging,
+and each was priced and rejected on evidence:
+
+- **No auto-stopping round cap**, and no shortening of review generically. The merge-gate
+  ten-round checkpoint is a recorded decision to continue or hold, not a stop (C-HE-21 §1).
+- **No best-of-N** / parallel variant generation as a speed fix — a measured null result at
+  this model's temperature.
+- **No fast mode for throughput** — 6× the price for 2.5× the throughput, and it would disturb
+  the 98.0% cache-read the token economics rest on.
+- **No agent framework** for mechanization (CLAUDE.md §3.2 framework-pull discipline).
+- **No collapsing of review layers** — 93.4% of 679 findings across 146 PRs were single-tool
+  catches, and merge-gate blocked 46% of 141 gated PRs.
 
 ## Notes
 

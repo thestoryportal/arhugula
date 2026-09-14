@@ -921,7 +921,11 @@ def test_session_end_hook_uses_supported_timeout() -> None:
     assert hooks[0]["timeout"] <= 3
 
 
-def test_merge_gate_honors_operator_authorized_ten_pass_ceiling() -> None:
+def test_merge_gate_honors_operator_authorized_ten_round_checkpoint() -> None:
+    # The 2026-08-01 operator decision set the period at ten rounds; C-HE-21 §1 (v1.5 X5,
+    # ratified 2026-08-25) makes it a recorded-decision checkpoint, never an auto-stopping
+    # cap (U-HE-39). All three carriers keep the period and the eleventh-disagreement
+    # decision point; they must not describe it as a cap.
     for path in [
         ROOT / ".agents" / "skills" / "merge-gate" / "SKILL.md",
         ROOT / ".claude" / "skills" / "merge-gate" / "SKILL.md",
@@ -931,6 +935,12 @@ def test_merge_gate_honors_operator_authorized_ten_pass_ceiling() -> None:
         assert "ten rounds" in merge_gate, path
         assert "eleventh" in merge_gate.lower(), path
         assert "disagreement" in merge_gate, path
+        assert "recorded-decision checkpoint" in merge_gate, path
+        # The noun alone survives "the checkpoint is a cap"; pin the negation (U-HE-39 lens r1).
+        assert "not a cap" in merge_gate or "never a cap" in merge_gate, path
+        assert "capped at ten" not in merge_gate.lower(), path
+        assert "cap this at ten" not in merge_gate.lower(), path
+        assert "cap automatic fix/re-gate at ten" not in merge_gate.lower(), path
 
     codex_merge_gate = (ROOT / ".agents" / "skills" / "merge-gate" / "SKILL.md").read_text(
         encoding="utf-8"

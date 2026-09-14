@@ -9,6 +9,13 @@ The single-command form of the "continue" ritual. This skill does **not** re-sta
 protocol — it **executes the canonical §12 protocol** so the recipe can never drift from
 the source of truth (the §10.5 stale-carry failure mode). Read the cited sections live.
 
+**Lane model (C-HE-01).** One turn of this loop is one lane's arc.
+N ≥ 2 lanes build concurrently in isolated worktrees, each with its own gates and reviewers,
+and land through exactly one merge door, one arc at a time (C-HE-01 §1); N is a dial (§2). The
+step-2 reservation and disjointness gate are what let a lane run beside its siblings.
+Throughput: well under N×; merges serialize; trailing lanes re-gate on head change —
+**prior, not measurement** until AC#10 (C-HE-28) produces a baseline.
+
 ## The loop (each step is governed by a canonical section — follow it there)
 
 1. **Session-start audit — CLAUDE.md §12.1.** Read `.harness/roadmap_status.md`; recompute

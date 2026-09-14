@@ -183,14 +183,17 @@ A raw `Agent` fan-out cannot enforce an output schema (that's what the `Workflow
   call (B-230 Task 5).** Write each lens's full response to
   `.harness/tmp/merge-gate-lens-<id>.txt` (in-worktree, gitignored — the permission guard
   auto-allows the wrapper only on in-worktree paths) and, once all three files exist, run
-  `just merge-gate-emit-all --pr <PR#> --arc-id <arc-id> --concurrency-json .harness/tmp/merge-gate-lens-concurrency.txt --spec-json .harness/tmp/merge-gate-lens-spec-conformance.txt --witness-json .harness/tmp/merge-gate-lens-witness-adequacy.txt`
+  `HARNESS_LANE_ID=<lane-id> just merge-gate-emit-all --pr <PR#> --arc-id <arc-id> --concurrency-json .harness/tmp/merge-gate-lens-concurrency.txt --spec-json .harness/tmp/merge-gate-lens-spec-conformance.txt --witness-json .harness/tmp/merge-gate-lens-witness-adequacy.txt`
   (`--arc-id` is the RESERVATION id, e.g. `u-he-34` — omitting it defaults the row's
   `arc_id` to `pr-<N>`, which breaks the join N6 and the reservation phase rows key on;
-  U-HE-34 r6). It records concurrency, spec-conformance and witness-adequacy in that
+  U-HE-34 r6. `<lane-id>` is this lane's `.harness/.lane-id` content, typed as a literal:
+  a bare call records the `-nolane` fallback in every row's `lane_id`, which C-HE-24 §6
+  requires to name the lane — every lens row recorded before U-HE-39 carries that
+  fallback). It records concurrency, spec-conformance and witness-adequacy in that
   order, ALWAYS all three (a recorded BLOCK is a result, not an abort), and exits with the
   worst of the three per-lens codes below. **Repair, never re-run:** if one lens exits 2,
   re-run THAT lens and record it alone with the per-lens form
-  `just merge-gate-emit --pr <PR#> --arc-id <arc-id> --lens <id> --verdict-json .harness/tmp/merge-gate-lens-<id>.txt`
+  `HARNESS_LANE_ID=<lane-id> just merge-gate-emit --pr <PR#> --arc-id <arc-id> --lens <id> --verdict-json .harness/tmp/merge-gate-lens-<id>.txt`
   — re-running `emit-all` would mint a fresh round for the two lenses that were fine (the
   duplicate-gate-round noise Task 0 measured). There is no resumption: the JSONL is the only
   record, and nothing is skipped on its say-so.
@@ -217,14 +220,21 @@ A raw `Agent` fan-out cannot enforce an output schema (that's what the `Workflow
   target row from any other arc; the `finding_id` is on the emitted JSONL row;
   `--actor` must differ from the lens producer, write-time enforced; exit 2 = not
   recorded, re-run). Rejected dispositions
-  keep a `unique_catch=true` row from counting (C-HE-29 §2). **Cap this at ten rounds total** (operator decision, 2026-08-01) — an eleventh
-  substantive disagreement is a genuine decision point,
-  not a bug to keep iterating on; auto-fix-and-re-gate without a cap is an infinite loop in
-  autonomous mode.
-- After the cap, or immediately for a judgment-call disagreement (not a mechanical defect):
-  surface via **one batched `AskUserQuestion`** showing all three verdicts verbatim and which
-  ones disagreed. Let the operator decide — this is a real fork per §12.4.1, not routine
-  progress to auto-resolve.
+  keep a `unique_catch=true` row from counting (C-HE-29 §2). **Every ten rounds is a
+  recorded-decision checkpoint, not a cap** (period set by operator decision, 2026-08-01;
+  recast under C-HE-21 §1, v1.5 X5, ratified 2026-08-25): an eleventh substantive
+  disagreement stops automatic fix-and-re-gate until a recorded decision continues or holds.
+  Continuation is unbounded — the next checkpoint falls ten rounds later — and the loop never
+  grants its own. Both failure shapes are real: without the checkpoint, auto-fix-and-re-gate
+  is an infinite loop in autonomous mode; with a cap, review is shortened exactly when it is
+  still paying. At round ten you will think "this is looping; call it and merge on what we
+  have." That is the moment the checkpoint exists for — ask, don't stop: PR #1034 produced
+  genuine findings through round 48 of 49, and round two's measured P1 rate (75%) ran above
+  round one's (62%).
+- At the checkpoint, or immediately for a judgment-call disagreement (not a mechanical defect):
+  surface via **one batched `AskUserQuestion`** showing all three verdicts verbatim, which
+  ones disagreed, and the late-round evidence above. Let the operator decide — this is a real
+  fork per §12.4.1, not routine progress to auto-resolve.
 - **Always report the three verdicts**, even on a clean all-approve — the `emit-all` call
   above (plus any per-lens repair) is the machine record (JSONL first, structured md line
   second). **After a per-lens repair the gate outcome is the worst of the three RECORDED
@@ -246,6 +256,37 @@ A raw `Agent` fan-out cannot enforce an output schema (that's what the `Workflow
   **The approvals transfer to that final head ONLY if `just merge-gate-landing-delta
   <reviewed-head>` exits 0** (the reviewed..final diff names nothing but the two gate-log
   files); any other file in that delta is unreviewed change — re-run the gate.
+
+## Standing constraints — live carriers, no round cap (C-HE-21, C-HE-35)
+
+Invariants bind by live carriage (C-HE-21 §2), not by an appeal to their number. Each one this
+gate leans on names the text that carries it today:
+
+- **#5 is live** (no verdict inferred from absence) in this skill's `## Parsing — fail closed`
+  and in `ship-pr`'s `## Pre-merge gate — CI green + decorrelated 3-lens review (before the
+  merge door)`.
+- **#14 is C-HE-19**: CANCELLED is INCOMPLETE, never green — carried by `ship-pr`'s post-merge
+  CI check and by `tools/merge_door.py`.
+- **invariant #16 is void**: C-HE-21 §2 found no concurrent-reviewer-cap carrier in `.claude/`,
+  `tools/`, `justfile` or CLAUDE.md. It throttles neither lenses nor lanes.
+
+A later appeal to a numbered invariant cites its live carrier the same way, or it does not
+bind. No flat round cap anywhere (C-HE-21 §1): the checkpoint in the gate outcome above
+punctuates review and never shortens it.
+No eval-harness / model-judge as a governance gate (C-HE-21 §4).
+
+Grounding-gate dispositions this gate inherits (C-HE-35):
+
+- **K5 —** structured findings require location, observed evidence, expected contract and a
+  reproduction basis (the C-HE-24 shape); admissible alternatives are optional, not mandated.
+- **K6 —** dropped: a reviewer never acquires authority to suppress its own finding by
+  self-classifying its scope. A lens may record scope metadata; suppression belongs to a second
+  decorrelated lens, a deterministic rule, or a logged operator override, and every suppression
+  leaves an audit row. Ambiguous scope blocks.
+- **K7 —** routing by arc type and finding class is deferred until their predictiveness is
+  measured (C-HE-26 §3); shadow mode only, if run at all.
+- **K8 —** a blocking post-edit hook is admitted only for fast, deterministic, low-false-positive
+  checks at a stable boundary (C-HE-31 §3), not on every intermediate edit.
 
 ## Wiring into `ship-pr` / the loop
 

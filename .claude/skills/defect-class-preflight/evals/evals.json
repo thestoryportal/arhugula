@@ -337,6 +337,37 @@
     "names the hand-copied binding values as a defect in its own right and requires the prompt to name the binding-file path for the lens to read — merely telling the teammate to double-check or re-copy the values does not pass",
     "catches the truncated head_sha concretely — 39 hex characters against the 40-character CI sha it was copied from — and states the consequence: emit recomputes the binding, the values differ, the verdict is NOT recorded, and the lens run is wasted"
    ]
+  },
+  {
+   "id": 20,
+   "eval_name": "doc-witness-pins-marker-not-claim",
+   "skill": "defect-class-preflight",
+   "prompt": "You are in /Users/robertrhu/Projects/arhugula-v2. A teammate is about to commit a shell doc witness and the skill text it checks; both are excerpted in .claude/skills/defect-class-preflight/evals/fixtures-uhe39/doc_witness_review.md. Run the defect-class-preflight sweep over the witness as it stands: for each problem, say what is wrong, cite the line, and say concretely how it fails (a specific edit to the skill text -> the witness result it produces). Write your review to the outputs directory given to you as review.md. Constraints: read-only outside your outputs directory; do NOT modify repo files, do NOT run the witness or any tests.",
+   "expected_output": "review.md naming the witness as vacuous in two shapes. Marker-only: P1 and P4 are pinned only by their `- **Pn —` bullet marker, so negating the claim after the marker (e.g. P1 'optional, not mandated' -> 'mandatory') keeps the witness at PASS=7. Half-claim: P3 is pinned only by the first half of its sentence, so its second clause 'shadow mode only, if run at all' can be inverted with the witness still green. The bare 'recorded-decision checkpoint' needle is the same shape: the noun survives changing 'not a cap' to 'a cap'. Only P2 is pinned by its whole claim.",
+   "files": [
+    "fixtures-uhe39/doc_witness_review.md"
+   ],
+   "assertions": [
+    "flags that P1 and P4 are pinned only by the bullet marker rather than the disposition text — passes only if the review names the marker-versus-claim distinction; a generic 'grep-based doc tests are weak' or 'add more tests' does not pass",
+    "flags that P3's needle stops mid-sentence and names its unpinned second clause ('shadow mode only, if run at all') as invertible with the witness green — noting only that P3 has a claim pin, or treating it as adequately covered, does not pass",
+    "gives a concrete surviving mutation that keeps the pinned text but negates or inverts the unpinned part (after a marker, or after a half-sentence needle), with the witness still green — deleting a whole bullet line does not pass, because the marker loop already catches that",
+    "names the `recorded-decision checkpoint` needle as the same vacuity (the noun survives an inversion of 'not a cap'), and does NOT flag the P2 pin, which covers P2's whole claim, as vacuous"
+   ]
+  },
+  {
+   "id": 21,
+   "eval_name": "carrier-command-shape-fix-left-unpinned",
+   "skill": "defect-class-preflight",
+   "prompt": "You are in /Users/robertrhu/Projects/arhugula-v2. A teammate is about to commit the change described in .claude/skills/defect-class-preflight/evals/fixtures-uhe39/command_prefix_notes.md. Run the defect-class-preflight sweep over it as it stands: for each problem, say what is wrong, cite the line, and say concretely how it fails (a specific later edit -> what happens, and whether any test notices). Write your review to the outputs directory given to you as review.md. Constraints: read-only outside your outputs directory; do NOT modify repo files, do NOT run tests.",
+   "expected_output": "review.md naming the documented command-shape fix as unwitnessed: nothing pins the `HARNESS_LANE_ID=<lane-id>` prefix on `just widget-emit` in either carrier, and the one existing test asserts only the substring `just widget-emit`, which passes with or without the prefix — so deleting the prefix, or leaving a stale bare copy of the old line beside the fixed one, silently restores the -nolane rows with every test green. The fix is a per-carrier pin on the prefixed form plus a check that no bare form remains.",
+   "files": [
+    "fixtures-uhe39/command_prefix_notes.md"
+   ],
+   "assertions": [
+    "names the prefixed command shape as unpinned by any test — passes only if the review ties the defect to the prefix itself; a general 'documentation changes should have tests' remark does not pass",
+    "explains why the existing substring assert cannot discriminate: `just widget-emit` is present whether or not the prefix is — noting only that the test is 'weak' or 'old' does not pass",
+    "proposes a witness that pins the prefixed form in BOTH carriers and also fails on a remaining bare `just widget-emit` line — a single-carrier pin, or a presence check with no bare-copy check, does not pass"
+   ]
   }
  ]
 }
