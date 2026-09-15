@@ -15,7 +15,7 @@
 resolve_codex() { # $1 = prompt
   command -v codex >/dev/null 2>&1 || { echo "[resolve] codex CLI absent" >&2; return 2; }
   hook_bounded "${RESOLVE_CODEX_TIMEOUT:-900}" \
-    env -u OPENAI_API_KEY codex exec -c preferred_auth_method="chatgpt" "$1"
+    env -u OPENAI_API_KEY codex exec -c model="gpt-5.6-sol" -c model_reasoning_effort="medium" -c preferred_auth_method="chatgpt" "$1"
 }
 
 # Record an auto-decision after Codex+Advisor AGREED. Usage: resolve_record <decision> <rationale>

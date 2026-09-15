@@ -744,14 +744,13 @@ _require-codex-subscription:
         exit 1; \
     fi
 
-# Reviewer model = gpt-5.6-sol (GPT-5.6 flagship tier), set as the default in
-# ~/.codex/config.toml (top-level + active profile) per operator direction
-# 2026-07-13 (upgraded from gpt-5.5 once GPT-5.6 shipped; requires codex-cli
-# >=0.144.3 — `codex update` if the model banner errors "requires a newer
-# version of Codex"). NOTE: `codex review` ignores a per-invocation `-c model=`
-# when a profile is active (the profile's model wins), so the model is
-# governed by config.toml, not pinned here. The run banner prints the
-# effective `model:` — confirm it reads `gpt-5.6-sol`.
+# Reviewer model = gpt-5.6-sol at medium reasoning effort, pinned per invocation on every
+# out-of-family review path (this recipe, tools/codex_review.py CODEX_OVERRIDES,
+# tools/hooks/resolve_lib.sh) — operator direction 2026-09-15, token cost. Not inherited from
+# ~/.codex/config.toml, whose top-level default is a different model. Probed 2026-09-15 on
+# codex-cli 0.154.0 with no profile active: both `codex exec` and `codex review` honor
+# `-c model=` and `-c model_reasoning_effort=`. The session rollout
+# (~/.codex/sessions/**/rollout-*.jsonl) records the effective `"model"` and `"reasoning_effort"`.
 
 # Out-of-family review of the committed branch HEAD vs BASE (default main), subscription auth.
 # Routed through the fail-closed wrapper (C-HE-18): schema-parsed verdict, session-artifact
@@ -766,7 +765,7 @@ codex-review base='main':
 
 # Out-of-family review of staged + unstaged + untracked changes, subscription auth.
 codex-review-uncommitted: _require-codex-subscription
-    env -u OPENAI_API_KEY codex review -c preferred_auth_method="chatgpt" --uncommitted
+    env -u OPENAI_API_KEY codex review -c model="gpt-5.6-sol" -c model_reasoning_effort="medium" -c preferred_auth_method="chatgpt" --uncommitted
 
 # Out-of-family diff review via Google Antigravity CLI (agy) — the decorrelated
 # artifact reviewer when Codex is the AUTHOR (mirror of codex-review, which

@@ -115,7 +115,7 @@ If the operator subsequently asks for resolution of a surfaced (Layer 1) tension
 
 ### 5b. Optional out-of-family Codex decorator (U-HK-19)
 
-After a tension is surfaced (or a single-voice recommendation is emitted), you MAY append a **Codex decorator** — a single out-of-family cross-check, **NOT a 12th deliberating voice**. The council is Claude-reviewing-Claude (correlated blind spots); `just codex-review` (gpt-5.5, ChatGPT subscription, $0, X-AL-1 H_E tooling) gives a **decorrelated** read of the same artifact/tension. It composes with the §13.1 division of labor: council + the transcript-brief reviewer are the in-family reviewers; Codex is the out-of-family one.
+After a tension is surfaced (or a single-voice recommendation is emitted), you MAY append a **Codex decorator** — a single out-of-family cross-check, **NOT a 12th deliberating voice**. The council is Claude-reviewing-Claude (correlated blind spots); `just codex-review` (gpt-5.6-sol at medium reasoning effort, pinned per invocation; ChatGPT subscription, $0, X-AL-1 H_E tooling) gives a **decorrelated** read of the same artifact/tension. It composes with the §13.1 division of labor: council + the transcript-brief reviewer are the in-family reviewers; Codex is the out-of-family one.
 
 **When to append it (opt-in, encouraged on high-blast-radius design):** the convened decision touches a concrete artifact or diff (a spec amendment, a contract shape, an impl seam), the tension is high-stakes, loop mode is active, or the operator asks ("add the Codex read"). **Skip it** for a pure preference call, a settled-routing question, or when there is no artifact for Codex to read.
 

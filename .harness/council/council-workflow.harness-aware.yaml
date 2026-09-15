@@ -120,7 +120,7 @@ stages:
   - id: E3
     name: Codex (out-of-family) + the brief-reviewer (in-family) — decorrelated evaluators
     who:
-      codex:   { tool: "just codex-review (gpt-5.5, $0 ChatGPT subscription)", family: out-of-family }
+      codex:   { tool: "just codex-review (gpt-5.6-sol at medium reasoning effort, $0 ChatGPT subscription)", family: out-of-family }
       brief_reviewer: { tool: "transcript-brief Agent review (fresh-context subagent + session brief; fork where supported)", family: in-family, sees: session brief / inherited conversation }
     decorrelation_discipline:                  # CLAUDE.md §13.1
       - Codex gets a DESCRIPTIVE primer ONLY (what the research/artifact IS) —

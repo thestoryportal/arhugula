@@ -48,7 +48,9 @@ End with exactly `VERDICT: APPROVE` or `VERDICT: BLOCK: <one-sentence reason>` a
 non-empty line (a bare `VERDICT: BLOCK` without its reason is not a verdict).
 ```
 
-Use the actual arc worktree with `-C`, `--ephemeral`, `--sandbox read-only`, and a distinct
+Use the actual arc worktree with `-C`, `--ephemeral`, `--sandbox read-only`, the review-model
+pins `-c model="gpt-5.6-sol" -c model_reasoning_effort="medium"` (required: the permission
+guard refuses a lens call without them, or with any other `-c`), and a distinct
 `--output-last-message /tmp/arhugula-pr-<N>-lens<1|2|3>-<40-char-head>.md`. Put `--`
 before the quoted prompt so prompt text cannot be interpreted as an option and the autonomous
 permission guard can validate options independently from reviewed text. The prompt must be
@@ -57,6 +59,7 @@ text inside that literal remain data:
 
 ```text
 env HARNESS_CODEX_REVIEW_ISOLATED=1 codex exec --ephemeral --sandbox read-only -C <arc-worktree> \
+  -c model="gpt-5.6-sol" -c model_reasoning_effort="medium" \
   --output-last-message /tmp/arhugula-pr-<N>-lens<1|2|3>-<40-char-head>.md \
   -- '<short instruction to read the named lens file, plus the self-contained tail above>'
 ```

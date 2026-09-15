@@ -378,7 +378,7 @@ _push_targets_main() {
 # The only out-of-worktree path is the exact /tmp report shape required by merge-gate.
 _safe_codex_exec_command() {
   local cmd="$1" options prompt tok value
-  local sandbox_count=0 ephemeral_count=0 cd_count=0 output_count=0
+  local sandbox_count=0 ephemeral_count=0 cd_count=0 output_count=0 model_count=0 effort_count=0
   case "$cmd" in *" -- "*) options=${cmd%% -- *}; prompt=${cmd#* -- } ;; *) return 1 ;; esac
   # The prompt may contain newlines and shell metacharacters only inside one literal
   # single-quoted argument. Reject embedded/extra quotes, which could terminate it and
@@ -419,11 +419,24 @@ _safe_codex_exec_command() {
         printf '%s' "$value" | grep -Eq '^/tmp/arhugula-pr-[0-9]+-lens[123]-[0-9a-f]{40}\.md$' || return 1
         output_count=$((output_count + 1))
         ;;
+      -c|--config)
+        # The review-model pins are the ONLY config overrides a lens may pass (operator
+        # direction 2026-09-15: gpt-5.6-sol at medium effort, never the config default).
+        # Any other -c could override the sandbox or approval policy pinned above.
+        [ "$#" -gt 0 ] || return 1
+        value="$1"; shift
+        case "$value" in
+          'model="gpt-5.6-sol"') model_count=$((model_count + 1)) ;;
+          'model_reasoning_effort="medium"') effort_count=$((effort_count + 1)) ;;
+          *) return 1 ;;
+        esac
+        ;;
       *) return 1 ;;
     esac
   done
   [ "$sandbox_count" = "1" ] && [ "$ephemeral_count" = "1" ] \
-    && [ "$cd_count" = "1" ] && [ "$output_count" = "1" ]
+    && [ "$cd_count" = "1" ] && [ "$output_count" = "1" ] \
+    && [ "$model_count" = "1" ] && [ "$effort_count" = "1" ]
 }
 
 # Emit an allow/deny decision in the schema for the firing event, then exit.

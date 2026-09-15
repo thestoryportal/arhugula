@@ -979,3 +979,16 @@ content-addressed files; `emit` accepted both against its own recomputation (exi
 | 2026-09-14T04:47:24Z | #1525 | 1f804e787e16 | merge-gate-witness-adequacy | BLOCK | 1 finding(s) | r5 |
 | 2026-09-14T05:07:20Z | #1525 | 0d8f79e104e6 | merge-gate-witness-adequacy | APPROVE | 0 finding(s) | r6 |
 | 2026-09-14T05:50:24Z | #1525 | 97c6fe99675a | merge-gate-witness-adequacy | APPROVE | 0 finding(s) | r7 |
+| 2026-09-15T20:42:44Z | #1528 | 61026113a94d | merge-gate-concurrency | APPROVE | 0 finding(s) | r1 |
+| 2026-09-15T20:42:44Z | #1528 | 61026113a94d | merge-gate-spec-conformance | APPROVE | 0 finding(s) | r1 |
+| 2026-09-15T20:42:44Z | #1528 | 61026113a94d | merge-gate-witness-adequacy | BLOCK | 1 finding(s) | r1 |
+| 2026-09-15T21:25:45Z | #1528 | 849dbcefc3cf | merge-gate-concurrency | BLOCK | 1 finding(s) | r2 |
+| 2026-09-15T21:25:45Z | #1528 | 849dbcefc3cf | merge-gate-spec-conformance | APPROVE | 0 finding(s) | r2 |
+| 2026-09-15T21:25:45Z | #1528 | 849dbcefc3cf | merge-gate-witness-adequacy | BLOCK | 2 finding(s) | r2 |
+| 2026-09-15T22:08:49Z | #1528 | 9c3f0d1c75a9 | merge-gate-concurrency | APPROVE | 0 finding(s) | r3 |
+| 2026-09-15T22:08:49Z | #1528 | 9c3f0d1c75a9 | merge-gate-spec-conformance | BLOCK | 2 finding(s) | r3 |
+| 2026-09-15T22:08:49Z | #1528 | 9c3f0d1c75a9 | merge-gate-witness-adequacy | APPROVE | 0 finding(s) | r3 |
+| 2026-09-15T22:46:17Z | #1528 | 030da81d701f | merge-gate-concurrency | APPROVE | 0 finding(s) | r4 |
+| 2026-09-15T22:46:17Z | #1528 | 030da81d701f | merge-gate-spec-conformance | APPROVE | 0 finding(s) | r4 |
+| 2026-09-15T22:46:17Z | #1528 | 030da81d701f | merge-gate-witness-adequacy | APPROVE | 0 finding(s) | r4 |
+| #1528 | 2026-09-15 | fix/codex-review-model-pin | merge-gate-concurrency: APPROVE (r4 @030da81d7, 0 findings; r1 @61026113a APPROVE, r2 @849dbcefc BLOCK 1 finding, r3 @9c3f0d1c7 APPROVE) | merge-gate-spec-conformance: APPROVE (r4 @030da81d7, 0 findings; r1 and r2 APPROVE, r3 @9c3f0d1c7 BLOCK 2 findings. Lens-reported, pre-existing and not caused by this diff: `Spec_HE_Loop_Lanes_v1.md` cites for `tools/hooks/permission-guard.sh` were already stale against origin/main, and this diff's +13-line insertion in `_safe_codex_exec_command` shifts the lines after it) | merge-gate-witness-adequacy: APPROVE (r4 @030da81d7, 0 findings; r1 @61026113a BLOCK 1 finding, r2 @849dbcefc BLOCK 2 findings, r3 APPROVE. Lens-reported P3, outside its findings array: `tools/hooks/test_resolve_lib.sh` already captures the real codex argv but does not assert the two new pins, so a reorder of the `-c` flags after the prompt argument in `resolve_lib.sh` would pass the source-text carrier check) | outcome: all-APPROVE at 030da81d7 after every BLOCK round's findings were absorbed onto the next head; Codex r1-r4 APPROVE (reservation round_outcomes); CI run 35030633737 success at 030da81d7 (round-4 lenses launched while pytest was still running, operator direction); merge authorized on all-APPROVE by the operator | blast-radius: NOT RUN (graft binary not installed in this venue; a 7-site grep floor was supplied to the concurrency and spec lenses instead) |

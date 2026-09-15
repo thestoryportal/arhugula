@@ -84,7 +84,19 @@ def review_instructions(binding: dict[str, str], *, nonce: str = "") -> str:
 
 
 #: The CLI overrides the channel runs with -- part of the bound configuration (codex round 10).
-CODEX_OVERRIDES = ("-c", 'preferred_auth_method="chatgpt"')
+#: Model and effort are pinned here rather than inherited from ~/.codex/config.toml: out-of-family
+#: review runs gpt-5.6-sol at medium reasoning effort (operator direction 2026-09-15, token cost);
+#: before the pin, u-he-42 rounds 1-3 ran the config default, gpt-6-astra at high. A 2026-09-15
+#: probe on codex-cli 0.154.0 confirmed `codex exec` records exactly these overrides in its
+#: session rollout (`"model"`, `"reasoning_effort"`).
+CODEX_OVERRIDES = (
+    "-c",
+    'model="gpt-5.6-sol"',
+    "-c",
+    'model_reasoning_effort="medium"',
+    "-c",
+    'preferred_auth_method="chatgpt"',
+)
 
 
 def build_command(workdir: Path, instructions: str, *, output_file: Path) -> list[str]:

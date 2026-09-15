@@ -9,7 +9,7 @@ both round-3 lens corruptions were transcription errors, not lens errors.
 
 ```sh
 for lens in lens1-concurrency lens2-spec-conformance lens3-test-witness; do
-  codex exec "$(cat .codex/notes/merge-gate-lenses/$lens.md)
+  codex exec -c model="gpt-5.6-sol" -c model_reasoning_effort="medium" "$(cat .codex/notes/merge-gate-lenses/$lens.md)
 
 PR under review: #<N> (branch <branch>, base main). Review the DIFF plus enough
 surrounding source to judge it. Immediately before your final line, print ONE fenced

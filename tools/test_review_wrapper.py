@@ -774,6 +774,68 @@ def test_build_command_is_codex_exec_read_only_with_output_file(tmp_path):
     assert "--base" not in cmd and 'preferred_auth_method="chatgpt"' in cmd
 
 
+#: Operator direction 2026-09-15: out-of-family review runs gpt-5.6-sol at medium reasoning
+#: effort, pinned by each review invocation rather than inherited from ~/.codex/config.toml.
+REVIEW_MODEL_PINS = ('model="gpt-5.6-sol"', 'model_reasoning_effort="medium"')
+
+#: The known review carriers besides the wrapper's own argv: (file, anchor), where the anchor
+#: selects exactly one command in that file. A new review carrier is added here when it is
+#: written. A keyword sweep that tried to recognise every possible command shape did not
+#: converge (#1528 merge-gate rounds 1-2); the permission guard refuses an unpinned isolated
+#: lens call at runtime, so this list pins the documented recipes rather than enforcing them.
+REVIEW_CARRIERS = (
+    ("tools/hooks/resolve_lib.sh", "env -u OPENAI_API_KEY codex exec"),
+    ("justfile", "env -u OPENAI_API_KEY codex review"),
+    (
+        ".agents/skills/merge-gate/SKILL.md",
+        "codex exec --ephemeral --sandbox read-only -C <arc-worktree>",
+    ),
+    (".codex/notes/merge-gate-lenses/README.md", '"$(cat .codex/notes/merge-gate-lenses/$lens.md)'),
+)
+#: The isolated-exec shape documented on the `.agents` bridge skills.
+BRIDGE_SHAPE = (
+    "HARNESS_CODEX_REVIEW_ISOLATED=1 codex exec --ephemeral --sandbox read-only -C <project>"
+)
+
+
+def _joined_lines(text: str) -> list[str]:
+    """Physical lines with backslash continuations folded, so a multi-line command is one."""
+    out: list[str] = []
+    buf = ""
+    for line in text.splitlines():
+        if line.rstrip().endswith("\\"):
+            buf += line.rstrip()[:-1] + " "
+            continue
+        out.append(buf + line)
+        buf = ""
+    return out
+
+
+def test_known_codex_review_carriers_pin_gpt_5_6_sol_at_medium_effort(tmp_path):
+    """Scope: the wrapper's argv, each carrier in REVIEW_CARRIERS, and every `.agents` skill line
+    carrying BRIDGE_SHAPE. It does not discover carriers that are not listed."""
+    cmd = cr.build_command(Path("/r"), "INSTR", output_file=tmp_path / "last.md")
+    for pin in REVIEW_MODEL_PINS:
+        assert cmd[cmd.index(pin) - 1] == "-c", cmd
+
+    root = Path(__file__).resolve().parent.parent
+    for rel, anchor in REVIEW_CARRIERS:
+        lines = _joined_lines((root / rel).read_text(encoding="utf-8"))
+        commands = [line for line in lines if anchor in line]
+        assert len(commands) == 1, (rel, anchor, commands)
+        assert all(pin in commands[0] for pin in REVIEW_MODEL_PINS), (rel, commands[0].strip())
+
+    bridges = [
+        (path.parent.name, line)
+        for path in sorted((root / ".agents" / "skills").glob("*/SKILL.md"))
+        for line in _joined_lines(path.read_text(encoding="utf-8"))
+        if BRIDGE_SHAPE in line
+    ]
+    assert "c1-orchestration-control" in {name for name, _ in bridges}
+    unpinned = [name for name, line in bridges if not all(p in line for p in REVIEW_MODEL_PINS)]
+    assert unpinned == []
+
+
 def test_review_instructions_name_the_bound_diff_and_carry_all_six_binding_values():
     text = cr.review_instructions(EXPECTED)
     assert f"git diff --binary {EXPECTED['base_sha']} {EXPECTED['head_sha']}" in text
