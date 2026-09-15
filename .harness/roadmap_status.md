@@ -8,9 +8,9 @@
 
 | Field | Value |
 |---|---|
-| `workspace_state_hash` | `985c644a041b` |
-| `last_refreshed` | 2026-09-14T00:00:00Z |
-| `git_head` | `c3e10a84` —  |
+| `workspace_state_hash` | `620993921d14` |
+| `last_refreshed` | 2026-09-15T00:00:00Z |
+| `git_head` | `248aa364` —  |
 | `latest_retirement_batch` | `.harness/phase-7d-retirement-events-batch-57.md` |
 | `open_fork_doc_count` | 120 |
 
@@ -22,7 +22,7 @@
 
 **Purpose.** Live pointer to the next Claude/Codex-executable frontier. Full round-by-round history (every prior round, verbatim, most-recent-first) lives in the archive below — grep it by PR/`B-`/`R-`-id/round, never read wholesale.
 
-**Current next action (post-#1525).** `U-HE-39` landed the C-HE-01/14/21/34/35 skill-carrier sweep. `two-lane` and `roadmap-continue` state the N ≥ 2 lane model with the "well under N× — prior, not measurement" qualifier; `two-lane` carries the C-HE-14 table copied byte-exact from the spec; `merge-gate` cites live carriers for invariants #5/#14, states #16 void and records K5–K8; `ship-pr` gains the C-HE-34 non-goals. The merge-gate "capped at ten rounds" rule (operator decision 2026-08-01) is now the C-HE-21 §1 recorded-decision checkpoint, same period, unbounded continuation. All of it is pinned by `tools/hooks/test_skill_lanes_docs.sh`, which matches each claim whole against the carrier with whitespace flattened and runs the two-lane-cap and round-cap scans over flattened text (base tree PASS=8 FAIL=56, head PASS=54 at `97c6fe996`). Three things matter to whoever touches these surfaces next. FIRST, two documented commands record a lane id only when `HARNESS_LANE_ID` is set, and agent shell exports do not survive between tool calls: a bare `just arc-metrics drain` held every merged arc (the prefixed drain folded 25 at `8857d95a5`), and a bare `merge-gate-emit` wrote `-nolane` into every lens row (396 at `a1f480f64`, append-only). Both carriers now document the prefix and the witness pins it; the loop-mode guard admits the prefixed emit shapes but admits neither form of the drain. SECOND, review ended on the round budget, not convergence: codex approved rounds 1–4, then returned REVIEWER_UNAVAILABLE for rounds 5–7, and gemini's failover blocked each round — all 14 arc findings were adjudicated (9 accepted and fixed, 5 rejected on measurement; the hold row's "21" is a miscount), but the round-7 witness fix `2cb5697d5` carries no out-of-family verdict, only the merge-gate witness lens's round-7 approval; the hold is a `DEFERRED-HIL` row, and `HARNESS_ARC_ID=u-he-39 HARNESS_LANE_ID=<lane-id> just review-attest-budget` still extends it. THIRD, still owed: the Implementation_Plan_HE_Loop_Lanes U-HE-38/U-HE-39 checkbox ticks as a doc-only PR; spec C-HE-01 §1's quote of `two-lane/SKILL.md:8` and its `:140-142` pilot-bar cite are stale clearance-time snapshots; `preflight-grep.sh` prints `sed: RE error: illegal byte sequence` on UTF-8 diffs; `u-he-26` stays queued and `pr-1407`/`1416`/`1418`/`1422`/`1424` stay held for lane `…-fdb755a8`; B-203 step (3) waits on a guard-admitted git invocation shape; and U-HE-37 Step 5 remains blocked on the operator-gated `just main-protection-apply`. The next unit is `U-HE-40` (`tools/mechanized_checks/`: seven classes, `just mech-check`, the state file, and the promotion/demotion machine).
+**Current next action (post-#1528).** #1528 pins every out-of-family Codex review invocation to `gpt-5.6-sol` at medium reasoning effort (operator direction 2026-09-15, token cost): `CODEX_OVERRIDES` in `tools/codex_review.py`, `tools/hooks/resolve_lib.sh`, the `codex-review-uncommitted` recipe, the Codex merge-gate lens call in `.agents` and `.codex/notes/merge-gate-lenses/README.md`, and the isolated-exec shape in the 31 `.agents` bridges, and the permission guard now requires both pins on an isolated lens call and refuses any other `-c`. Before it, every review inherited `~/.codex/config.toml`'s `gpt-6-astra` at high; the first review through the pinned wrapper recorded `gpt-5.6-sol`/`medium` in its rollout. Three things follow. The next implementable unit is `U-HE-42`. FIRST, #1527 (U-HE-42, `codex-context-check-ci` parity recipe) is mid merge-gate: round 1 recorded concurrency BLOCK, spec APPROVE, witness BLOCK at `1753f5869`, all three findings were fixed and adjudicated accepted (`f922a2f6f`, `b47510f46`), and its branch still carries the unpinned wrapper, so it rebases onto this `main` before its Codex round 4 and a merge-gate re-run; the operator approved shipping it over the disjointness refusal on the append-only `.harness/merge-gate-log.jsonl`. SECOND, U-HE-40 stays on its branch in the root checkout with a +2 budget extension recorded 2026-09-15 at the operator's direction; it also rebases onto this `main`, then owes a fresh sweep before its round 11. THIRD, still owed: the forward-register row drafted as B-245 (C-HE-33 §4's outcome measure has no input on the arc-metrics row) and a row for the disjointness gate refusing any two concurrently reviewed lanes on the append-only gate log, both blocked while U-HE-40's branch holds its own register rows; the plan checkbox ticks for U-HE-38/39/42 as a doc-only PR; spec C-HE-01 §1's `two-lane/SKILL.md:8` quote, its `:140-142` pilot-bar cite, and C-HE-33 §3's `ci.yml:536-542` cite are stale; `preflight-grep.sh` prints `sed: RE error: illegal byte sequence` on UTF-8 diffs; `test_codex_workflow_parity.py`'s `".claude" in str(path)` branch reds in any checkout under `.claude/`, and `test_rtk_shape_guard.sh` reds against the installed rtk, both on clean `main`; `u-he-26` stays queued; B-203 step (3) waits on a guard-admitted git invocation shape; and U-HE-37 Step 5 remains blocked on the operator-gated `just main-protection-apply`. Then U-HE-43 (`tools/shadow_trial.py`), after #1527 lands.
 
 **Archive.** `.harness/roadmap-next-action-archive.md` (PRIOR rounds only, verbatim as each stood when superseded — the current round lives only in this head; the newest superseded round may lag there until the next content PR archives it, and is always losslessly recoverable from this file's own git history meanwhile).
 
@@ -43,6 +43,8 @@
 | PR | Branch | R-NNN | Posture |
 |---|---|---|---|
 | #1292 | `fix/codex-hook-contract-recovery` | — | — |
+| #1527 | `feat/u-he-42-codex-context-ci-parity` | — | — |
+| #1529 | `roadmap-refresh-post-1528` | — | — |
 
 ---
 
@@ -50,11 +52,11 @@
 
 | R-NNN / PR | Closed at | Notes |
 |---|---|---|
+| PR #1528 | 2026-09-15 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1525 | 2026-09-14 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1523 | 2026-09-05 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1521 | 2026-09-04 | B-235 operator-facing half: --detail renders the canonical close_out above the prose copy; B-236 registered; arc ended on round budget, not convergence |
 | PR #1519 | 2026-09-04 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
-| PR #1517 | 2026-09-04 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 
 ---
 
