@@ -1,0 +1,8 @@
+# Regenerable or oversized run inputs, kept out of git by the 2026-09-16 decision
+# recorded in ../context-stack-handoff-2026-09-16-s2.md §2 A. The results files
+# beside them are the record; README.md says what each excluded set was.
+E2/*.diff
+E2/prompt_*.txt
+E6-vault/
+*.log
+E7/*.err
