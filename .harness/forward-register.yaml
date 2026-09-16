@@ -71,14 +71,14 @@
 
 
 snapshot:
-  total: 239
+  total: 240
   open: 1
   design_substrate_gated: 3
-  registered_finding: 81
+  registered_finding: 82
   operator_gated: 0
   held: 3
   closed: 151
-  identity_digest: 46693d9de4eb9f21
+  identity_digest: 48f7700d9844025b
 items:
 - id: B-1
   title: Layered capability-aware routing activation
@@ -11494,3 +11494,31 @@ items:
     and three spec clauses; no cross-domain tension to convene over.'
   heading: '### B-239 · the cohort field is named for lanes and stores siblings, and the spec counts both
     ways *(surfaced on u-he-38 r6, 2026-09-04; consumer resolved, spec text REGISTERED)*'
+- id: B-247
+  title: C-HE-27 records one {start, end} pair per phase, first-write-wins, so N6's denominator holds only
+    the round-1 window and per-round wall clock is unmeasured
+  pr: '#pending (surfaced by the 2026-09-16 wall-clock audit of u-he-42, PR #1527; nothing built)'
+  status: registered_finding
+  summary: 'C-HE-27 §3 accretes each phase''s {start, end} pair ONCE on the reservation''s `phases` map;
+    `record_phase` in `tools/reservations.py` is first-write-wins and replay-idempotent, and the review
+    wrapper says so in its own comment above `emit_verify` (`justfile`, `review-with-failover-logged`:
+    "re-review rounds 2..n re-emit as no-ops and the durable pair stays the round-1 window"). §4 defines
+    N6 as accepted findings divided by the sum of `phases.verify` + `phases.edit` hours read from that
+    map. On u-he-42 (reservation generation 53 at merge) the map holds queue 2.1 min, verify 1.7 min,
+    absorb 0.5 min, edit 5.2 min -- every span inside the first 31 minutes of a 547-minute arc that ran
+    12 codex/gemini rounds and 6 merge-gate lens rounds. N6''s denominator therefore sees 6.9 minutes of
+    review for an arc whose gate-log rows span roughly 345 minutes of rounds, and the same shape holds
+    for every arc with more than one round. The per-round wall clock the 2026-09-16 audit needed had to be
+    re-derived from inter-row gaps in `.harness/merge-gate-log.jsonl`, which §2 names as the one way a
+    phase duration must not be measured.'
+  close_out: 'REGISTERED 2026-09-16, not built. The fix is a contract decision on a cleared spec -- C-HE-27
+    §3''s one-pair-per-phase shape -- so it routes through design-phase back-flow, not from the consumer
+    that noticed it (root CLAUDE.md §4.3/§4.4). WHAT CLOSES THIS ROW: a C-HE-27 amendment that keys spans
+    per (phase, round) or accretes per-round durations on the reservation, with §4''s denominator summing
+    every round and REVIEWER_UNAVAILABLE rounds bucketed as §4 already specifies; then the wrapper emits
+    the round key the gate admission already knows, and `tools/arc_metrics.py` folds the map at drain.
+    Until then N6 on a multi-round arc is an upper bound, and per-round timing is read from the gate log
+    with §2''s caveat stated next to the number.'
+  council: 'NO -- a measured schema gap with one mechanism; the only decision is the key shape, which the
+    spec author takes at amendment.'
+  heading: '### B-247 · C-HE-27 spans keep only round 1, so N6 overstates multi-round arcs and per-round wall clock is unmeasured *(surfaced by the u-he-42 wall-clock audit, 2026-09-16; REGISTERED)*'
