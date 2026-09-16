@@ -71,14 +71,14 @@
 
 
 snapshot:
-  total: 240
+  total: 242
   open: 1
   design_substrate_gated: 3
-  registered_finding: 82
+  registered_finding: 84
   operator_gated: 0
   held: 3
   closed: 151
-  identity_digest: 48f7700d9844025b
+  identity_digest: e3bde36a2d2c7e38
 items:
 - id: B-1
   title: Layered capability-aware routing activation
@@ -11494,6 +11494,57 @@ items:
     and three spec clauses; no cross-domain tension to convene over.'
   heading: '### B-239 · the cohort field is named for lanes and stores siblings, and the spec counts both
     ways *(surfaced on u-he-38 r6, 2026-09-04; consumer resolved, spec text REGISTERED)*'
+- id: B-245
+  title: C-HE-28 §4 outcome-measure cohorts are unowned — C-HE-33 §4's measure has no input on the arc-metrics row -- `ci_runs` counts runs
+    on the merge commit and no run conclusion is stored
+  pr: '#1527 (surfaced by the u-he-42 grounding pass; the measure was not built; row landed on the post-arc register PR)'
+  status: registered_finding
+  summary: 'C-HE-33 §4 names the local/CI-gap outcome measure as two tracked cohorts (C-HE-28): the share
+    of branches burning at least 6 CI runs, and the CANCELLED-run share. Plan U-HE-42 Step 2-3 places
+    it as "two lines in `summary` (`arc_metrics.py`) over `ci_runs` (already on the row) -- no new store".
+    Grounding at `c2fa885c6` falsifies the "already on the row" premise for both lines. `tools/arc_metrics.py`
+    fills `ci_runs` from `ci_metrics(row.merge_sha)`, which asks `gh run list --commit <merge sha>`: it
+    counts the runs on the landed merge commit, not the runs a branch burned before it landed. The same
+    function keeps only green-run durations in `ci_wall_s` and stores no per-run conclusion, so a CANCELLED
+    share has no input either. Neither line can be written over the existing row without a new captured
+    field.'
+  close_out: 'REGISTERED 2026-09-15 on u-he-42; the outcome measure was not built. U-HE-42 landed the rest
+    of its C-HE-33 scope: the `codex-context-check-ci` recipe, `tools/test_codex_context_guard.py::test_local_ci_parity`,
+    and the pre-push line in both ship-pr carriers. WHAT CLOSES THIS ROW: an arc that captures a branch-level
+    CI run count and each run''s conclusion on the arc-metrics row at queue time (a C-HE-25 row-field
+    extension), then adds the two `summary` lines over those fields; or a C-HE-33 §4 amendment that names
+    a measure the existing row supports. RATIFICATION 2026-09-15: Re-scoped by the ratified Class 1 fork
+    (.harness/class_1_fork_c_he_33_outcome_measure_mandates_an_input_that_does_not_exist.md, Reading C).
+    The measure is NOT U-HE-42''s to build: plan :7473 was amended to stop assigning it, :7838 now records
+    C-HE-28 §4 as UNOWNED against this row, and U-HE-42 owes only C-HE-33''s parity half (its Verification
+    names exactly one witness, test_local_ci_parity, which landed green). This row therefore tracks a
+    C-HE-28 obligation, not a U-HE-42 residual. Closure is unchanged: capture a branch-level CI run count
+    and each run''s conclusion on the C-HE-25 row, then add the two summary lines over those fields. AS LANDED: U-HE-42 shipped on PR #1527 (merge 107e5533, 2026-09-16) with the C-HE-33 §3 half only; the plan''s Rev 2026-09-15 line and the :7838 UNOWNED entry landed on doc-only PR #1530 (merge 100733c4) with their as-built clearance marker.'
+  council: 'NO -- a false plan premise found by reading the producer; no design tension to convene over.'
+  heading: '### B-245 · C-HE-33''s outcome measure has no input on the arc-metrics row *(surfaced on
+    u-he-42 grounding, 2026-09-15; REGISTERED)*'
+- id: B-246
+  title: C-HE-33 local/CI parity is FALSE in CI's real two-parent merge checkout --
+    TRACKING_SURFACES_REVIEW_REQUIRED diverges outside PARITY_EXCLUSIONS
+  pr: '#1527 (surfaced by codex u-he-42 round 10; measured by probe, not inferred)'
+  status: registered_finding
+  summary: 'C-HE-33 §3 claims the CI-shaped and local-shaped guard invocations agree for one committed
+    SHA apart from the named PARITY_EXCLUSIONS, and U-HE-42 registers test_local_ci_parity as its witness.
+    The witness builds a ONE-PARENT child of the PR head, but on pull_request `actions/checkout` leaves a
+    TWO-PARENT synthetic merge at HEAD (.github/workflows/ci.yml:430-436), and the two shapes do not agree.
+    MEASURED 2026-09-15 at 32a4f26f4 by running both invocations over identical fixtures that differ only
+    in parentage: ONE-PARENT -> symmetric difference {ROADMAP_STATUS_DRIFT_ALLOWED,
+    ROADMAP_STATUS_BRANCH_DIVERGED}, both named, so OUTSIDE-EXCLUSIONS is EMPTY. TWO-PARENT -> CI emits
+    TRACKING_SURFACES_REVIEW_REQUIRED and the local shape does not, so OUTSIDE-EXCLUSIONS is
+    {TRACKING_SURFACES_REVIEW_REQUIRED}. The code is warn severity (tools/codex_context_guard.py:1594),
+    fires on `mode in {closeout, check} and state.changed_files and not _has_tracking_changes(...)`
+    (:1587-1591), appears NOWHERE in tools/test_codex_context_guard.py, and is absent from
+    PARITY_EXCLUSIONS. So the parity claim is not merely untested in CI''s real shape -- it is false there,
+    and the registered witness cannot see it by construction.'
+  close_out: 'REGISTERED 2026-09-15 on u-he-42 (PR #1527, merge 107e5533 on 2026-09-16), NOT absorbed. At registration the arc stood at codex round 10 after nine BLOCK rounds, three of which (r7, r8, r10) were defects in fixtures written to close the previous round; the arc then ran codex r11 (REVIEWER_UNAVAILABLE, gemini failover) and r12, and merge-gate lens rounds 2-6 before landing. Codex r12 re-derived this row''s defect at fdd47ef38 and it was adjudicated rejected-as-registered; merge-gate r3 accepted a class sibling (the two CONTEXT_CHECKPOINT_* parity exclusions were declared but undriven) absorbed in fdd47ef38, which did not change the one-parent fixture shape this row names. WHAT LANDED: the codex-context-check-ci recipe (fetch origin/main first, resolved refs, refusal on a moved HEAD, checked-sha line for the carrier), the permission-guard allow, both ship-pr carriers, and test_local_ci_parity, a true witness of the ONE-PARENT shape with seven named exclusions each driven by its own test. WHAT CLOSES THIS ROW: rebuild the parity witness over a real `git merge --no-ff` fixture, then EITHER name TRACKING_SURFACES_REVIEW_REQUIRED in PARITY_EXCLUSIONS with its CI-only reason (its `changed_files` come from the committed --head-ref range while the local shape uses --include-branch-diff against live HEAD), OR fix the divergence so the two shapes agree. Do NOT close it by widening the exclusion set without a case that drives the merge shape -- that is the r8 defect. Sibling: B-247 (C-HE-27 spans keep only round 1) for the timing side of the same arc.'
+  council: 'NO -- a measured behavioural divergence with a named mechanism; no design tension to convene over.'
+  heading: '### B-246 · C-HE-33 parity is false in CI''s two-parent merge checkout *(surfaced on u-he-42
+    codex r10, 2026-09-15; MEASURED; REGISTERED)*'
 - id: B-247
   title: C-HE-27 records one {start, end} pair per phase, first-write-wins, so N6's denominator holds only
     the round-1 window and per-round wall clock is unmeasured
