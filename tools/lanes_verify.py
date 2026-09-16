@@ -472,6 +472,20 @@ MANIFEST: list[Row] = [
         "local + CI",
         False,
     ),
+    # C-HE-32/33 §3 (U-HE-42) — local/CI guard PARITY only: the CI step and the CI-shaped
+    # recipe pass the same argv, and the CI and local shapes differ only within the named
+    # exclusions. Scoped to §3 deliberately (codex u-he-42 r7 P2): C-HE-33 §4 also requires the
+    # >=6-CI-run branch share and the CANCELLED-run share, which this arc does NOT build —
+    # `ci_metrics(row.merge_sha)` counts runs on the merge commit and stores no per-run
+    # conclusion, so neither measure has an input. That gap is the owed B-245 register row; an
+    # unscoped "C-HE-32/33" here would read as a green witness over an absent contract part.
+    Row(
+        "C-HE-32/33 §3",
+        "pytest:tools/test_codex_context_guard.py::test_local_ci_parity",
+        "layer2",
+        "local + CI",
+        False,
+    ),
     # WR-14 (U-SR-07) — session-shape habit lines at their loop-skill carriers.
     # mutation-probe `—`: the probed artifact is markdown skill prose, outside the
     # probe tool's language set (C-HE-30 static-doc-witness precedent); the manual

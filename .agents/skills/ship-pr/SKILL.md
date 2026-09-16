@@ -73,7 +73,11 @@ review the new diff again. Never count self-review by the authoring model as dec
 
 ## Commit, PR, and CI
 
-1. Commit the explicit staged scope and push the topic branch.
+1. Commit the explicit staged scope and push the topic branch. This carrier does not run
+   `just codex-context-check-ci`, the Claude carrier's CI-shaped pre-push guard (U-HE-42,
+   C-HE-33): an active Codex loop binds its pre-closeout gates to the pre-commit HEAD, so
+   `check` reports `CODEX_LOOP_INCOMPLETE` from the commit until every ship gate is
+   recorded, a local-only finding CI never sees.
 2. Disjointness re-check at ship (U-HE-36; B-228) — AFTER that commit, so `HEAD` carries
    the arc's changes (codex u-he-36 r8: before it, staged work is invisible to the gate):
    run `uv run python tools/arc_disjoint_check.py check --candidate HEAD` (the same

@@ -30,6 +30,20 @@ canonical §12 protocol** rather than re-stating it — the recipe lives in CLAU
   would refuse the landing later; C-HE-13 §5). Exit 2 → the gate could not run; surface the
   printed cause. At selection the candidate was `main`, so this is the first invocation
   with real content on the candidate side.
+- **CI-shaped guard — run it IMMEDIATELY BEFORE EVERY PUSH, on the final commit (U-HE-42;
+  C-HE-33).** Run `just codex-context-check-ci` on the committed branch — the context guard
+  with the explicit refs and `--allow-roadmap-drift` CI's guard job passes — so its verdict
+  converges locally and the branch is pushed once. **Not a one-shot pre-flight step** (codex
+  u-he-42 r7 P2): every BLOCK round below lands a fix commit, which moves HEAD past whatever
+  this gate last checked, so a gate run before the review loop says nothing about the commit
+  you actually push. Re-run it after the FINAL review-driven commit; the recipe itself refuses
+  a HEAD that moved while the guard ran, but only for the run you actually make. On success it
+  prints `checked <sha>`: push THAT sha by name (`git push origin <sha>:refs/heads/<branch>`),
+  never `HEAD` (merge-gate r2 concurrency P2) — the check-exit-to-push window is outside the
+  recipe, and a commit that lands in it cannot ride a push that names the checked sha. Same cadence
+  as `just leg-selfcheck` below, and for the same reason. `just codex-context-check` stays the
+  checkpoint-bound local gate; what the two shapes may differ on is named in
+  `tools/test_codex_context_guard.py::test_local_ci_parity`.
 - **Grounding pass (U-WT-01).** Before codex round 1: (a) re-read every `file:line` cite in
   the diff and PR body at HEAD — never from recall; (b) recompute every count/arithmetic
   claim from the actual source rather than restating it; (c) confirm every `#NNN` reference

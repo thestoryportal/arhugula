@@ -396,6 +396,8 @@ for c in \
   "just codex-preflight" \
   "just codex-checkpoint after-review" \
   "just codex-closeout" \
+  "just codex-context-check" \
+  "just codex-context-check-ci" \
   "just codex-autonomous-arc R-123" \
   "just codex-loop-record --phase plan --status passed --command plan --evidence grounded" \
   "just codex-loop-status" \
@@ -795,6 +797,9 @@ OUT=$(run_on "$(jq -nc --arg p "$REPO/src" '{"hook_event_name":"PreToolUse","too
 # 6) PermissionRequest event uses the decision.behavior schema.
 OUT=$(run_on "$(pl Bash 'git status' '' PermissionRequest)")
 [ "$(beh "$OUT")" = "allow" ] && ok "PermissionRequest allow schema" || bad "PR allow schema wrong: $OUT"
+# U-HE-42: ship-pr's pre-push step must not stall a headless lane at either hook event.
+OUT=$(run_on "$(pl Bash 'just codex-context-check-ci' '' PermissionRequest)")
+[ "$(beh "$OUT")" = "allow" ] && ok "PermissionRequest allows just codex-context-check-ci" || bad "PR codex-context-check-ci not allowed: $OUT"
 OUT=$(run_on "$(pl Bash 'rm -rf /' '' PermissionRequest)")
 [ "$(beh "$OUT")" = "deny" ] && ok "PermissionRequest deny schema" || bad "PR deny schema wrong: $OUT"
 

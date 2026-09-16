@@ -217,6 +217,17 @@ and context-check recipes pass `--include-branch-diff`, so a clean feature
 worktree is still checked against committed changes since the merge-base with
 the default branch.
 
+`codex-context-check-ci` runs the guard the way CI does: `check` with explicit
+`--base-ref` / `--head-ref` set to the SHAs of `origin/main` and `HEAD`, each read
+once, and `--allow-roadmap-drift`, no checkpoint. It refuses a branch that does not contain `origin/main`, because CI's
+two-endpoint diff would then include main's newer commits; fetch and rebase first.
+It is the Claude lane's pre-push step (C-HE-33). The Codex ship flow does not run it:
+inside an active Codex autonomous loop the pre-closeout gates are bound to the
+pre-commit HEAD, so `check` reports `CODEX_LOOP_INCOMPLETE` from the commit until
+every ship gate is recorded, a local-only finding CI never sees. The findings the two local
+recipes may legitimately disagree on are named in
+`tools/test_codex_context_guard.py::test_local_ci_parity`.
+
 CI runs the guard directly without local checkpoint freshness because
 `.harness/.checkpoints/` is intentionally untracked. The CI invocation passes
 explicit `--base-ref` / `--head-ref` values from the GitHub event so the guard

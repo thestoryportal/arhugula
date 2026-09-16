@@ -1779,6 +1779,33 @@ def main(argv: list[str] | None = None) -> int:
         allow_roadmap_drift=args.allow_roadmap_drift,
         require_fresh_checkpoint=args.require_fresh_checkpoint,
     )
+    # codex u-he-42 r4 (P2) / r5 (P1): a resolved `--head-ref` bounds only `changed_files`;
+    # derive() independently reads live HEAD for head8, branch, status_entries and
+    # computed_hash, so the report can describe a commit whose diff was never evaluated.
+    # DISCLOSED, never refused: HEAD differing from `--head-ref` is the NORMAL shape on every
+    # CI pull_request run -- actions/checkout leaves the synthetic merge ref at HEAD
+    # (.github/workflows/ci.yml:430-436) while the guard is handed the PR head sha (:644), so a
+    # hard finding here would fail the blocking job on every PR (codex r5 P1, accepted).
+    # head8 is NOT re-bound to `--head-ref`: it is the live checkout's identity for the
+    # codex-loop gate comparisons (_codex_loop_issues) and the checkpoint fingerprint, and
+    # redefining it would silently change those mechanisms. Distinct from BASE_TOCTOU, which is
+    # the merge door's base race; this names the guard's own head/report divergence.
+    # Compared against state.head8 -- derive()'s ONE read of HEAD, the value the report prints
+    # -- never a second `rev-parse` here (merge-gate r2 concurrency P2): a commit landing
+    # between two reads would make the disclosure vouch for a head8 it never compared.
+    if args.head_ref:
+        checked_head = _out(["git", "rev-parse", f"{args.head_ref}^{{commit}}"], cwd=state.root)
+        if checked_head and not checked_head.startswith(state.head8):
+            findings = [
+                *findings,
+                Finding(
+                    "info",
+                    "CHECKED_HEAD_NOT_LIVE_HEAD",
+                    f"diff evaluated against --head-ref {checked_head[:12]}; head8/context hash "
+                    f"above describe HEAD as derive() read it ({state.head8}) -- normal on a CI "
+                    "merge-ref checkout, a moved HEAD locally",
+                ),
+            ]
     print(_json_report(state, findings) if args.json else _text_report(state, findings))
     if args.mode in {"preflight", "checkpoint"}:
         path = write_checkpoint(

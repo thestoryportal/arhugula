@@ -86,6 +86,42 @@ codex-context-check:
     /usr/bin/python3 tools/codex_context_guard.py checkpoint --label local-check --include-branch-diff
     /usr/bin/python3 tools/codex_context_guard.py check --require-fresh-checkpoint --include-branch-diff
 
+# C-HE-33 §3: the guard as CI's `codex-context-guard` job runs it -- explicit committed-range
+# refs plus --allow-roadmap-drift, no checkpoint -- so a PR's guard verdict converges before
+# the push. CI's two-endpoint diff starts at the PR base; on a branch that contains
+# origin/main that base, main's tip and the merge-base are one commit, so the recipe refuses
+# any other branch rather than report a parity it cannot have (rebase onto the fresh tip).
+# origin/main is REFRESHED first (codex u-he-42 r4 P2): the tracking ref is shared by every
+# worktree and goes stale silently, and a stale one is an ancestor of a branch that the real
+# main has already moved past -- the ancestry check then passes and the guard is handed a base
+# CI would never use. The fetch runs under `set -euo pipefail`, so an unreachable remote fails
+# loudly rather than falling back to the stale ref. Both refs are then read once and the guard
+# gets the resolved SHAs, as CI passes them: HEAD can move mid-run, so a second read could
+# check one commit and diff another -- the guard DISCLOSES a HEAD that differs from
+# `--head-ref` (CHECKED_HEAD_NOT_LIVE_HEAD, info) rather than attribute the verdict silently to
+# an unevaluated commit; it never refuses on it, because CI's merge-ref checkout diverges by
+# construction on every pull_request run (codex u-he-42 r5 P1). The RECIPE then re-checks
+# HEAD after the guard returns (codex u-he-42 r6 P2): this is the Claude carrier's pre-push
+# gate (`.claude/skills/ship-pr/SKILL.md`), so a HEAD that advanced mid-run would let the push
+# publish a commit the gate never checked. Refusing is safe HERE and not in the guard: CI
+# invokes the guard directly (.github/workflows/ci.yml:642-645) and never runs this recipe, so
+# the merge-ref divergence that made a guard-side refusal a P1 cannot reach this line. What
+# still differs from the local shape above is named in
+# tools/test_codex_context_guard.py::test_local_ci_parity. The window AFTER the recipe exits
+# and before the push is outside it (merge-gate r2 concurrency P2), so on success the recipe
+# prints the sha it checked and the carrier pushes that sha by name, never HEAD.
+codex-context-check-ci:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    git fetch --quiet origin main
+    base="$(git rev-parse origin/main)"
+    head="$(git rev-parse HEAD)"
+    git merge-base --is-ancestor "$base" "$head" || { echo "codex-context-check-ci: HEAD does not contain origin/main; rebase onto it first, or CI's diff will include main's newer commits" >&2; exit 1; }
+    /usr/bin/python3 tools/codex_context_guard.py check --base-ref "$base" --head-ref "$head" --allow-roadmap-drift
+    live="$(git rev-parse HEAD)"
+    [ "$live" = "$head" ] || { echo "codex-context-check-ci: HEAD moved from $head to $live while the guard ran; the verdict describes the old commit -- re-run before pushing" >&2; exit 1; }
+    echo "codex-context-check-ci: checked $head -- push this sha, not HEAD"
+
 # Log a credential-gated unit after all non-credential work is closed.
 codex-credential-gate *args:
     /usr/bin/python3 tools/codex_context_guard.py credential-gate {{args}}
