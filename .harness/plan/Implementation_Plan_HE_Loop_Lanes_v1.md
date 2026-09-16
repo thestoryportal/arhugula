@@ -7470,7 +7470,9 @@ def test_local_ci_parity(tmp_path, monkeypatch):
 codex-context-check-ci:
     /usr/bin/python3 tools/codex_context_guard.py check --base-ref "$(git merge-base origin/main HEAD)" --head-ref HEAD --allow-roadmap-drift
 ```
-`ship-pr`: *"Before the single push: `just codex-context-check-ci` (parity with CI's guard job — converge locally, push once)."* Track the outcome measure (≥ 6-CI-run branch share; CANCELLED share) as two lines in `summary` (`arc_metrics.py`) over `ci_runs` (already on the row) — no new store.
+`ship-pr`: *"Before the single push: `just codex-context-check-ci` (parity with CI's guard job — converge locally, push once)."* The outcome measure (≥ 6-CI-run branch share; CANCELLED share) is tracked under **C-HE-28 §4**, NOT built here — see `.harness/class_1_fork_c_he_33_outcome_measure_mandates_an_input_that_does_not_exist.md`.
+
+**Rev 2026-09-15 (U-HE-42 execution correction, as-built — Class 1 fork ratified under Reading C).** This line previously read *"Track the outcome measure … as two lines in `summary` (`arc_metrics.py`) over `ci_runs` (already on the row) — no new store"*, which is unsatisfiable as written and contradicted this unit's own `**Spec linkage.**` line above (*"outcome measure via C-HE-28 cohorts"*). Both named inputs fail at HEAD: `ci_runs` is `len(hit)` from `ci_metrics(row.merge_sha)` (`tools/arc_metrics.py:698`, `:562-574`) — runs on the MERGE COMMIT, so there is no branch-level denominator for a "share of branches burning ≥ 6 CI runs"; and `conclusion` is fetched (`:558`) but used only to filter timings (`:569`) and never persisted, so a CANCELLED share is not derivable (`ci_runs − len(ci_wall_s)` yields NON-GREEN, conflating CANCELLED with `failure` — a distinction C-HE-19 §1 makes load-bearing). Repairing either requires a new captured field, which the same sentence forbade. Resolved by reconciling this line to `:7452` and to spec C-HE-33 §4, whose own words place the two shares as "the tracked cohorts (**C-HE-28**)": the measure belongs to C-HE-28's owner, and U-HE-42 owes only the parity half (C-HE-33's Verification names exactly one witness, the parity test — built and green). Tracking row: **B-245**, re-scoped to C-HE-28 §4.
 - [ ] **Step 4:** Register `Row("C-HE-32/33", "pytest:tools/test_codex_context_guard.py::test_local_ci_parity", "layer2", "CI", False)`. Commit `feat(he-lanes): U-HE-42 codex-context-check-ci parity recipe + parity test (C-HE-33)`.
 
 ---
@@ -7833,7 +7835,7 @@ Every contract row has ≥ 1 unit; every unit appears in ≥ 1 row (checked at U
 | C-HE-25 | U-HE-11 |
 | C-HE-26 | U-HE-12 (§2); U-HE-17 + U-HE-21 (§1); U-HE-38 (§3 EVALUATE gate) |
 | C-HE-27 | U-HE-34 (§1–§4); U-HE-17 (`record_phase`); U-HE-19 (fold at drain) |
-| C-HE-28 | U-HE-38 (§1–§3) |
+| C-HE-28 | U-HE-38 (§1–§3); U-HE-51 (§4 lens trial); **§4 outcome-measure cohorts UNOWNED — B-245** (rev 2026-09-15: moved off U-HE-42 when the Class 1 fork on C-HE-33 §4 ratified under Reading C; needs a branch-level CI run count + per-run conclusion on the C-HE-25 row before any unit can own it) |
 | C-HE-29 | U-HE-43 (§1–§5) |
 | C-HE-30 | U-HE-14 |
 | C-HE-31 | U-HE-40 (§1–§5) |
