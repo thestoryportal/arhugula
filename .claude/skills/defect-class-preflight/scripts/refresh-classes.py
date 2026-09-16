@@ -6,8 +6,14 @@ the log is the one authority and only grows. This prints (a) current per-class
 counts — compare them to the counts baked into SKILL.md and refresh the text when
 they have moved meaningfully — and (b) the most recent findings that match NO
 known class: those are candidates for a new class, surfaced mechanically instead
-of waiting for recall. Advisory by design: always exits 0, output is for the
-agent running the preflight, never a gate.
+of waiting for recall. The report is advisory by design: it always exits 0 and its
+output is for the agent running the preflight, never a gate.
+
+The `classify` verb is the one consumer-facing seam: `tools/review_loop_gate.py`
+feeds it an arc's outstanding reviewer findings at sweep template/attest time, and a
+finding it leaves unmatched owes the author an `intake:` disposition there (SKILL.md
+"When a reviewer catches what this sweep missed"). That verb exits non-zero on
+malformed input — the gate must never read 'could not classify' as 'unmatched'.
 """
 
 from __future__ import annotations
@@ -111,6 +117,15 @@ CLASSES: dict[str, str | tuple[str, ...]] = {
         # alternative because there is no boundary inside it either.
         r"\block\b|\blocks\b|RLock|mutex|reentran|acquire",
     ),
+    # Added by the preflight-finding-intake arc through its own intake line (the first
+    # finding to flow in mechanically): the review-loop gate classified the working
+    # tree while the attestation bound base..HEAD; the 2026-08-19 row is the same
+    # defect on the reviewer wrapper. Conjunction: a tree-state term AND a binding term
+    # — either alone is co-occurrence noise (`committed` is in half the corpus).
+    "15 bound bytes are not the executed bytes": (
+        r"working tree|live worktree|uncommitted|mutable tree|dirty",
+        r"binding|base_sha|head_sha|\bHEAD\b|committed (diff|range|bytes|base)",
+    ),
 }
 
 
@@ -120,7 +135,45 @@ def matches(pattern: str | tuple[str, ...], text: str) -> bool:
     return all(re.search(p, text, re.I) for p in patterns)
 
 
+def classify(text: str) -> list[str]:
+    """Every class name whose row `text` satisfies, in table order; empty = unmatched.
+    [LAW:effects-at-boundaries] pure over the text — the report and the review gate's
+    intake both derive from this one function, so 'unmatched' means the same thing in
+    the corpus report and at a sweep attestation ([LAW:one-source-of-truth])."""
+    return [name for name, pat in CLASSES.items() if matches(pat, text)]
+
+
+def finding_text(row: dict) -> str:
+    """The text a finding row is classified on: evidence plus location (the location
+    carries file-shaped vocabulary such as `justfile` or `test_` that some rows rely on)."""
+    return (row.get("observed_evidence") or "") + " " + (row.get("location") or "")
+
+
+def classify_stdin() -> int:
+    """`classify` verb: JSON list of {"finding_id", "observed_evidence", "location"} on
+    stdin → JSON object finding_id → [class names] on stdout. The review-loop gate
+    calls this at template and attest time so an unmatched reviewer finding is named
+    as one at the moment its author must disposition it (the skill's repair loop,
+    made mechanical). Malformed input is a loud non-zero exit, never an empty map
+    that would read as 'every finding unmatched' ([LAW:no-silent-failure])."""
+    try:
+        rows = json.load(sys.stdin)
+        if not isinstance(rows, list):
+            raise TypeError(f"expected a JSON list of findings, got {type(rows).__name__}")
+        out = {str(r["finding_id"]): classify(finding_text(r)) for r in rows}
+    except (json.JSONDecodeError, KeyError, TypeError, AttributeError) as exc:
+        print(f"refresh-classes classify: malformed input — {exc}", file=sys.stderr)
+        return 2
+    json.dump(out, sys.stdout)
+    return 0
+
+
 def main() -> int:
+    if sys.argv[1:] == ["classify"]:
+        return classify_stdin()
+    if sys.argv[1:]:
+        print("usage: refresh-classes.py [classify]  (no verb: corpus report)", file=sys.stderr)
+        return 2
     log = Path(__file__).resolve().parents[3].parent / ".harness" / "merge-gate-log.jsonl"
     if not log.exists():
         # Fallback: resolve from the repo root when the skill is invoked from cwd.
@@ -151,13 +204,10 @@ def main() -> int:
     counts = dict.fromkeys(CLASSES, 0)
     unmatched = []
     for r in rows:
-        text = (r.get("observed_evidence") or "") + " " + (r.get("location") or "")
-        hit = False
-        for name, pat in CLASSES.items():
-            if matches(pat, text):
-                counts[name] += 1
-                hit = True
-        if not hit:
+        hits = classify(finding_text(r))
+        for name in hits:
+            counts[name] += 1
+        if not hits:
             unmatched.append(r)
 
     status = f" (INCOMPLETE — {malformed} malformed row(s) skipped)" if malformed else ""

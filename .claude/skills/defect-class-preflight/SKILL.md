@@ -392,6 +392,19 @@ because the handler that only sets a flag this round grows a cleanup call the ne
 Keep handlers to what is async-signal-safe (set a flag, write one byte to a
 self-pipe) and let an ordinary thread do the work under the lock.
 
+### 15. Bound bytes are not the executed bytes (added preflight-finding-intake; 10 rows at the 2026-09-16 corpus, 2 of them this exact shape)
+
+A check, reviewer, or classifier runs against the **working tree** while the record it
+produces binds the **committed** `base..HEAD` range — so an uncommitted edit can make
+the check pass, the attestation records HEAD, and the edit is then reverted or never
+lands. The 2026-08-19 wrapper finding ("the reviewer runs against the live worktree
+while the binding covers only the committed diff") and this arc's own codex r1 P2
+(the class table read from the tree while the sweep attestation bound HEAD) are the
+same defect. **Question:** *for every artifact whose record names a binding, do the
+bytes it actually read come from that binding (`git show HEAD:<path>`, `base..head`
+diff), never from the tree?* If a test can make the check pass by writing a file
+without committing it, this is the class.
+
 ## After every review round — the class-sibling sweep (before the next invocation)
 
 A reviewer finding names an INSTANCE; the absorption owes the CLASS. Measured on the
@@ -489,8 +502,29 @@ Then add the miss as a planted-defect case in the skill's eval set
 regression-tested like code. The skill file is tracked; its git history is the audit
 trail — no separate ledger.
 
-**Staleness check:** `scripts/refresh-classes.py` re-clusters the live gate log and
-prints per-class counts plus recent findings matching NO known class — those
+**The loop is enforced at the sweep attestation, not remembered.** This obligation
+executed zero times across the ten absorption commits of U-HE-35 while it lived only
+in this prose (charter §1, "nothing flows in"). So `just review-template-sweep`
+classifies every outstanding reviewer finding against `scripts/refresh-classes.py`'s
+table (its `classify` verb) and stamps the result above each finding; a finding that
+matches NO class is marked `UNMATCHED` and pre-filled with an `intake:` slot that
+`just review-attest-sweep` refuses to leave empty. Exactly one of:
+
+- `intake: class-extended <class-number> <what changed>` — you extended a row in
+  `refresh-classes.py` (and this file) so the finding now matches;
+- `intake: new-class <name> <what changed>` — you added a class in both places;
+- `intake: instance-only <why no class should carry it>` — a genuine one-off.
+
+A repair claim is **verified, never trusted**: attest re-classifies with the live
+table, and a finding still unmatched under `class-extended` / `new-class` refuses the
+attestation until the row lands (or the disposition becomes `instance-only`). A
+finding whose repair landed simply matches and owes no intake line. `instance-only`
+dispositions are recorded on the sweep attestation (`intake_instance_only`), so the
+escape hatch's rate is measurable — an arc that dispositions every unmatched finding
+as a one-off has answered the letter of the loop and none of its intent.
+
+**Staleness check:** `scripts/refresh-classes.py` (no verb) re-clusters the live gate
+log and prints per-class counts plus recent findings matching NO known class — those
 unmatched findings are new-class candidates. Run it when the log has grown
 meaningfully since the counts in this file (the class headings are bound to the
 corpus named above them).
