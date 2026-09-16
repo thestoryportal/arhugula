@@ -8,9 +8,9 @@
 
 | Field | Value |
 |---|---|
-| `workspace_state_hash` | `79645130ff4b` |
+| `workspace_state_hash` | `e65ddddbb773` |
 | `last_refreshed` | 2026-09-16T00:00:00Z |
-| `git_head` | `a436658a` —  |
+| `git_head` | `2740d96b` —  |
 | `latest_retirement_batch` | `.harness/phase-7d-retirement-events-batch-57.md` |
 | `open_fork_doc_count` | 121 |
 
@@ -22,7 +22,7 @@
 
 **Purpose.** Live pointer to the next Claude/Codex-executable frontier. Full round-by-round history (every prior round, verbatim, most-recent-first) lives in the archive below — grep it by PR/`B-`/`R-`-id/round, never read wholesale.
 
-**Current next action (post-#1538).** PR #1538 landed the preflight finding-intake mechanism: `refresh-classes.py classify`, class stamps + a required `intake:` slot on the sweep template, HEAD-bytes re-classification at attest, class 15 "bound bytes are not the executed bytes", and `intake_instance_only` on the sweep attestation; the self-evolving-skills handoff at docs/research/context-stack-handoff-2026-09-16.md §5 is the durable record of the grounding (all WR-01..16 landed as U-SR-01..08). Owed next, in order: (1) a doc-only PR committing docs/research/ (audit + handoff + E*-results; never bundled with code — the stop-gate reads it as DESIGN_IMPL_MIX), (2) the class-2 `drift` extension (30 corpus rows; data-only), (3) E4/E2/E3 re-runs per handoff §4 A–C; then U-HE-43.
+**Current next action (post-#1540).** PR #1540 committed the context-stack program record under docs/research/ (the 2026-09-16 audit, the eight evaluations with scripts and results, both session handoffs; E2 diffs/prompts, E6-vault and run logs excluded by a scoped .gitignore per the operator's 2026-09-16 decision); the eval scripts now derive the repo root from their own path, and the README's "Known defects" section records the seven codex round-1 script findings left unabsorbed under the lean doc-only protocol. Owed next, in the order of docs/research/context-stack-handoff-2026-09-16-s2.md §2: (B) the class-2 `drift` extension (data-only, plus the lens P3 test), (C) E4 with real questions, (D) E2 on PRs with callers under harness-*/src, (E) the E3 reconfiguration with boilerplate exclusion and a target definition; the instance-only intake cap/trigger question (handoff-s2 §4) is deferred by operator decision until a rate baseline exists; then U-HE-43.
 
 **Archive.** `.harness/roadmap-next-action-archive.md` (PRIOR rounds only, verbatim as each stood when superseded — the current round lives only in this head; the newest superseded round may lag there until the next content PR archives it, and is always losslessly recoverable from this file's own git history meanwhile).
 
@@ -50,11 +50,11 @@
 
 | R-NNN / PR | Closed at | Notes |
 |---|---|---|
+| PR #1540 | 2026-09-16 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1538 | 2026-09-16 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1536 | 2026-09-16 | B-245 (C-HE-28 §4 outcome-measure cohorts unowned) and B-246 (C-HE-33 §3 parity false in CI's two-parent checkout, measured) registered on PR #1536 (merge 902cd3b3) as one doc-only PR under the lean protocol: codex one round, APPROVE, 0 findings. Both were U-HE-42 residuals drafted mid-arc; close-outs rewritten post-convergence. Register: 242 items / 84 registered_finding. The U-HE-42 close is now fully recorded: #1527 code, #1530 fork + plan amendment, #1534 plan ticks, #1532 B-247, #1536 B-245/B-246. |
 | PR #1534 | 2026-09-16 | Plan records for U-HE-38 (#1523), U-HE-39 (#1525) and U-HE-42 (#1527) landed on PR #1534 (merge a940ce2d): Steps 1-4 ticked with dated as-built status paragraphs in the #1519 shape, plus the as-built clearance marker and heads regen. Codex r1 BLOCK 3 P2 (marker added; B-245/B-246 restated as drafted, not registered; Step-1 reopening rejected on the #1519 tick semantics), r2 APPROVE. |
 | PR #1532 | 2026-09-16 | B-247 registered (PR #1532, merge cbd6d3df): C-HE-27 spans keep only the round-1 window per phase, so N6's denominator undercounts every multi-round arc and per-round wall clock is unmeasured; surfaced by the 2026-09-16 wall-clock audit of u-he-42 (547 min measured). Doc-only; codex APPROVE, 0 findings; nothing built, closure routes through a C-HE-27 amendment. |
-| PR #1527 | 2026-09-16 | U-HE-42 (C-HE-33 §3 parity recipe, PR #1527, merge 107e5533) landed after the DESIGN/IMPL split: #1530 (merge 100733c4) carried the C-HE-33 §4 Class 1 fork ratified under Reading C, the B-246 addendum, the plan amendment at :7473/:7838 and its as-built clearance marker. 28 findings / 28 adjudicated (25 accepted, 3 rejected) across codex r1-r12, one gemini failover and merge-gate lens rounds 1-6; both main post-merge runs green (35053346583; the 107e5533 run pending at refresh time). Owed: B-245 and B-246 register rows (blocked on the held U-HE-40 branch, B-244) and plan checkbox ticks for U-HE-38/39/42 as a doc-only PR. |
 
 ---
 
