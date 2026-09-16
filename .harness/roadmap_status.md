@@ -8,9 +8,9 @@
 
 | Field | Value |
 |---|---|
-| `workspace_state_hash` | `f1d940dcbca9` |
+| `workspace_state_hash` | `3321d3e5d4bc` |
 | `last_refreshed` | 2026-09-16T00:00:00Z |
-| `git_head` | `cbd6d3df` —  |
+| `git_head` | `a940ce2d` —  |
 | `latest_retirement_batch` | `.harness/phase-7d-retirement-events-batch-57.md` |
 | `open_fork_doc_count` | 121 |
 
@@ -22,7 +22,7 @@
 
 **Purpose.** Live pointer to the next Claude/Codex-executable frontier. Full round-by-round history (every prior round, verbatim, most-recent-first) lives in the archive below — grep it by PR/`B-`/`R-`-id/round, never read wholesale.
 
-**Current next action (post-#1532).** The next implementable unit is U-HE-39 (§4 queue). Before it, two doc-only debts from the U-HE-42 close remain: (1) plan checkbox ticks for U-HE-38, U-HE-39 and U-HE-42 in Implementation_Plan_HE_Loop_Lanes_v1.md; (2) the B-245 and B-246 forward-register rows (drafts beside the 2026-09-15 22:15 checkpoint) once U-HE-40 (held unmerged, B-244) lands or is abandoned. B-247 landed on #1532 as the audit's tooling row.
+**Current next action (post-#1534).** The next implementable unit is U-HE-43 (shadow trial: scoring reducer, no_finding markers, kill rule, OC table, HITL delivery). U-HE-39 is already merged (#1525, 2026-09-14), so the earlier pointer to it was stale; U-HE-40 is held unmerged (B-244) and U-HE-41 depends on U-HE-40, so neither is implementable now. Still owed: the B-245 and B-246 forward-register rows (drafts beside the 2026-09-15 22:15 checkpoint) once U-HE-40 lands or is abandoned.
 
 **Archive.** `.harness/roadmap-next-action-archive.md` (PRIOR rounds only, verbatim as each stood when superseded — the current round lives only in this head; the newest superseded round may lag there until the next content PR archives it, and is always losslessly recoverable from this file's own git history meanwhile).
 
@@ -50,11 +50,11 @@
 
 | R-NNN / PR | Closed at | Notes |
 |---|---|---|
+| PR #1534 | 2026-09-16 | Plan records for U-HE-38 (#1523), U-HE-39 (#1525) and U-HE-42 (#1527) landed on PR #1534 (merge a940ce2d): Steps 1-4 ticked with dated as-built status paragraphs in the #1519 shape, plus the as-built clearance marker and heads regen. Codex r1 BLOCK 3 P2 (marker added; B-245/B-246 restated as drafted, not registered; Step-1 reopening rejected on the #1519 tick semantics), r2 APPROVE. |
 | PR #1532 | 2026-09-16 | B-247 registered (PR #1532, merge cbd6d3df): C-HE-27 spans keep only the round-1 window per phase, so N6's denominator undercounts every multi-round arc and per-round wall clock is unmeasured; surfaced by the 2026-09-16 wall-clock audit of u-he-42 (547 min measured). Doc-only; codex APPROVE, 0 findings; nothing built, closure routes through a C-HE-27 amendment. |
 | PR #1527 | 2026-09-16 | U-HE-42 (C-HE-33 §3 parity recipe, PR #1527, merge 107e5533) landed after the DESIGN/IMPL split: #1530 (merge 100733c4) carried the C-HE-33 §4 Class 1 fork ratified under Reading C, the B-246 addendum, the plan amendment at :7473/:7838 and its as-built clearance marker. 28 findings / 28 adjudicated (25 accepted, 3 rejected) across codex r1-r12, one gemini failover and merge-gate lens rounds 1-6; both main post-merge runs green (35053346583; the 107e5533 run pending at refresh time). Owed: B-245 and B-246 register rows (blocked on the held U-HE-40 branch, B-244) and plan checkbox ticks for U-HE-38/39/42 as a doc-only PR. |
 | PR #1528 | 2026-09-15 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1525 | 2026-09-14 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
-| PR #1523 | 2026-09-05 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 
 ---
 
