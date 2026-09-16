@@ -53,5 +53,5 @@ dropped, so a marker can never leave the corpus unaccounted for.
 | Family | Head | Cleared | Artifact | Markers | Head marker |
 |---|---|---|---|---|---|
 | `class-1-fork-provider-construction-allowlist-semantic` | `§10-amendment (prefer-OAuth default; supersedes E-prod-3's False default forward)` | 2026-07-09 | `.harness/class_1_fork_provider_construction_allowlist_semantic.md` | 1 | `provider-construction-allowlist-prefer-oauth-cleared-2026-07-09.md` |
-| `implementation-plan-he-loop-lanes` | `v1.0 + rev 2026-09-15 (U-HE-42 execution correction, as-built — the C-HE-33 §4 outcome-measure line at :7473 and the C-HE-28 coverage row at :7838)` | 2026-09-15 | `.harness/plan/Implementation_Plan_HE_Loop_Lanes_v1.md` | 19 | `implementation-plan-he-loop-lanes-v1-u-he-42-c-he-33-reading-c-cleared-2026-09-15.md` |
+| `implementation-plan-he-loop-lanes` | `v1.0 + rev 2026-09-16 (U-HE-38 / U-HE-39 / U-HE-42 as-built plan record — Unit-status paragraphs and Steps 1–4 ticks; no step text, contract number, row label or ordering changes)` | 2026-09-16 | `.harness/plan/Implementation_Plan_HE_Loop_Lanes_v1.md` | 20 | `implementation-plan-he-loop-lanes-v1-u-he-38-39-42-as-built-record-cleared-2026-09-16.md` |
 | `spec-he-loop-lanes` | `v1.7` | 2026-09-02 | `.harness/spec/Spec_HE_Loop_Lanes_v1.md` | 8 | `spec-he-loop-lanes-v1.7-cleared-2026-09-02.md` |

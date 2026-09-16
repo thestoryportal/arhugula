@@ -6929,7 +6929,9 @@ only because `loop-optimization-plan-2026-09-03.md` does not match that pattern.
 
 **Depends on.** U-HE-11, U-HE-12, U-HE-33.
 
-- [ ] **Step 1: Test**
+**Unit status (as-built, ticked 2026-09-16).** Steps 1–4 ran and are merged on PR #1523 (2026-09-05; ten codex rounds to convergence — 30 findings, 27 accepted, 3 rejected, per the PR body). Divergence from the sketch below: Step 4's row is registered as `"C-HE-28 §1+§3"`, not the draft `"C-HE-27/28"` — narrowed at codex r4, and the comment beside the row in `tools/lanes_verify.py` records why. Residuals registered rather than absorbed: B-237 (no emitter appends the §2 drift numerator), B-238 (lever stratification of the joint key, deferred), B-239 (C-HE-28 names the cohort field for lanes while the sensor stores siblings — spec wording routed to back-flow, consumer converts).
+
+- [x] **Step 1: Test**
 ```python
 def test_cohort_by_concurrent_lanes_at_open_and_arc_type(tmp_path, monkeypatch, capsys):
     rows = []
@@ -6946,7 +6948,7 @@ def test_cohort_by_concurrent_lanes_at_open_and_arc_type(tmp_path, monkeypatch, 
     assert "correlational" in out and "(N=2, applying) n=3" in out and "median 120.0" in out.split("(N=2, applying)")[1][:80]
     assert "drift incidence by concurrent_lanes_at_open" in out and "N=4: 1/6" in out
 ```
-- [ ] **Step 2–3:** RED; implement the joint grouping (`(r.get("concurrent_lanes_at_open"), r.get("arc_type_open"))` → label `(N=<n>, <t>)`, `null` rendered), the drift join (`GATE_LOG = REPO/".harness"/"merge-gate-log.jsonl"`; rows with `producer == "ROADMAP_STATUS_DRIFT"` counted per `concurrent_lanes_at_open` of the joined arc), and the header line: `NOTE: cohort deltas are CORRELATIONAL — assignment to N is operator-chosen (C-HE-28 §3); descriptive counts only until N>=2 and 'applying' cells populate.`
+- [x] **Step 2–3:** RED; implement the joint grouping (`(r.get("concurrent_lanes_at_open"), r.get("arc_type_open"))` → label `(N=<n>, <t>)`, `null` rendered), the drift join (`GATE_LOG = REPO/".harness"/"merge-gate-log.jsonl"`; rows with `producer == "ROADMAP_STATUS_DRIFT"` counted per `concurrent_lanes_at_open` of the joined arc), and the header line: `NOTE: cohort deltas are CORRELATIONAL — assignment to N is operator-chosen (C-HE-28 §3); descriptive counts only until N>=2 and 'applying' cells populate.`
 
 In `arc_metrics.py` (`GATE_LOG = REPO / ".harness" / "merge-gate-log.jsonl"` next to `LEDGER`; block appended to `summary()` after the lever cohorts):
 ```python
@@ -6975,7 +6977,7 @@ In `arc_metrics.py` (`GATE_LOG = REPO / ".harness" / "merge-gate-log.jsonl"` nex
     print("drift incidence by concurrent_lanes_at_open: " + ", ".join(f"N={n}: {hits[0]}/{len([r for r in rows if json.dumps(r.get('concurrent_lanes_at_open')) == n])}" for n, hits in sorted(per_n.items())))
 ```
 
-- [ ] **Step 4:** Register `Row("C-HE-27/28", "pytest:tools/test_arc_metrics.py::test_cohort_by_concurrent_lanes_at_open_and_arc_type", "measurement", "local + CI", False)`. Commit `feat(he-lanes): U-HE-38 joint (N, arc_type) cohorts + drift join, correlational header (C-HE-28)`.
+- [x] **Step 4:** Register `Row("C-HE-27/28", "pytest:tools/test_arc_metrics.py::test_cohort_by_concurrent_lanes_at_open_and_arc_type", "measurement", "local + CI", False)`. Commit `feat(he-lanes): U-HE-38 joint (N, arc_type) cohorts + drift join, correlational header (C-HE-28)`.
 
 ---
 
@@ -6989,7 +6991,9 @@ In `arc_metrics.py` (`GATE_LOG = REPO / ".harness" / "merge-gate-log.jsonl"` nex
 
 **Depends on.** U-HE-07, U-HE-28, U-HE-37.
 
-- [ ] **Step 1: Test** (`tools/hooks/test_skill_lanes_docs.sh`):
+**Unit status (as-built, ticked 2026-09-16).** Steps 1–4 ran and are merged on PR #1525 (2026-09-14). Step 1's witness shipped as `tools/hooks/test_skill_lanes_docs.sh` at 54 checks — PASS=8 FAIL=56 against the pre-sweep skills, PASS=54 FAIL=0 at the landed head — wider than the six-line sketch below; Step 4's row is registered as `"C-HE-01/14/21/34/35"` as written. Touched beyond the sketch: `.agents/skills/merge-gate` (the Codex projection's cap line, bound by `test_codex_workflow_parity.py`) and two lane-id fixes the PR body names. Named residual in the witness: a cap stated with neither a qualifier nor a number is outside what its pattern can see.
+
+- [x] **Step 1: Test** (`tools/hooks/test_skill_lanes_docs.sh`):
 ```bash
 TL=.claude/skills/two-lane/SKILL.md; RC=.claude/skills/roadmap-continue/SKILL.md; MG=.claude/skills/merge-gate/SKILL.md; SP=.claude/skills/ship-pr/SKILL.md
 grep -q 'N ≥ 2' "$TL" && grep -q 'N ≥ 2' "$RC" && ok "N >= 2 model stated" || bad "N>=2 wording missing"
@@ -6999,8 +7003,8 @@ grep -q 'invariant #16' "$MG" && grep -q 'void' "$MG" && ok "#16 void stated" ||
 ! grep -Eiq '(max|cap)[^.]{0,20}(round|rounds)[^.]{0,10}[0-9]+|round cap[^.]{0,10}[0-9]+' "$MG" "$SP" "$RC" "$TL" && ok "AC#7: no numeric round cap in loop skills" || bad "numeric round cap found"
 grep -q 'C-HE-34' "$SP" && grep -q 'K6' "$MG" && ok "non-goals + K5–K8 recorded" || bad "non-goals missing"
 ```
-- [ ] **Step 2–3:** RED; edits: `two-lane/SKILL.md:8` → *"N ≥ 2 lanes build concurrently in isolated worktrees, each with its own gates and reviewers, and land through exactly one merge door, one arc at a time (C-HE-01 §1). N is a dial (§2). Throughput: well under N×; merges serialize; trailing lanes re-gate on head change — **prior, not measurement** until AC#10 (C-HE-28) produces a baseline."* + a `## Rejected and blocked mechanisms (C-HE-14)` section copying the eleven-row table verbatim; `roadmap-continue` gains the same N ≥ 2 sentence + the lane-init/reservation steps (U-HE-21); `merge-gate/SKILL.md` gains *"Invariants bind by live carriage (C-HE-21 §2): #5 is live at merge-gate/SKILL.md 'Parsing — fail closed' and ship-pr's post-merge acceptance; #14 is C-HE-19; **invariant #16 is void** (no concurrent-reviewer-cap carrier exists). No flat round cap anywhere (C-HE-21 §1). K6 self-classification is dropped: a reviewer never acquires authority to suppress its own finding (C-HE-35). No eval-harness / model-judge as a governance gate."*; `ship-pr/SKILL.md` gains a `## Non-goals (C-HE-34)` list (no round cap; no best-of-N as speed fix; no fast mode for throughput; no agent framework; no collapsing review layers).
-- [ ] **Step 4:** Register `Row("C-HE-01/14/21/34/35", "shell:tools/hooks/test_skill_lanes_docs.sh", "phase0", "local + CI", False)`. Commit `docs(he-lanes): U-HE-39 skill carriers — N>=2 model, blocked list, live-carrier cites, no round cap, non-goals (C-HE-01/14/21/34/35)`.
+- [x] **Step 2–3:** RED; edits: `two-lane/SKILL.md:8` → *"N ≥ 2 lanes build concurrently in isolated worktrees, each with its own gates and reviewers, and land through exactly one merge door, one arc at a time (C-HE-01 §1). N is a dial (§2). Throughput: well under N×; merges serialize; trailing lanes re-gate on head change — **prior, not measurement** until AC#10 (C-HE-28) produces a baseline."* + a `## Rejected and blocked mechanisms (C-HE-14)` section copying the eleven-row table verbatim; `roadmap-continue` gains the same N ≥ 2 sentence + the lane-init/reservation steps (U-HE-21); `merge-gate/SKILL.md` gains *"Invariants bind by live carriage (C-HE-21 §2): #5 is live at merge-gate/SKILL.md 'Parsing — fail closed' and ship-pr's post-merge acceptance; #14 is C-HE-19; **invariant #16 is void** (no concurrent-reviewer-cap carrier exists). No flat round cap anywhere (C-HE-21 §1). K6 self-classification is dropped: a reviewer never acquires authority to suppress its own finding (C-HE-35). No eval-harness / model-judge as a governance gate."*; `ship-pr/SKILL.md` gains a `## Non-goals (C-HE-34)` list (no round cap; no best-of-N as speed fix; no fast mode for throughput; no agent framework; no collapsing review layers).
+- [x] **Step 4:** Register `Row("C-HE-01/14/21/34/35", "shell:tools/hooks/test_skill_lanes_docs.sh", "phase0", "local + CI", False)`. Commit `docs(he-lanes): U-HE-39 skill carriers — N>=2 model, blocked list, live-carrier cites, no round cap, non-goals (C-HE-01/14/21/34/35)`.
 
 ---
 # S7 — Mechanize classes → dedupe executions → local/CI gap (Layer 2)
@@ -7455,7 +7459,9 @@ Recipe: `equivalence-proof removed proof_by context_diff:` → `uv run python -c
 
 **Depends on.** U-HE-33.
 
-- [ ] **Step 1: Test**
+**Unit status (as-built, ticked 2026-09-16).** Steps 1–4 ran and are merged on PR #1527 (2026-09-16; the C-HE-33 §4 Class 1 fork, its Reading-C ratification and this plan's Rev 2026-09-15 line landed first on doc-only PR #1530). Divergences from the sketch below: Step 1's `--local-shape` flag was never built — parity is witnessed by running the real recipe body parsed from the `justfile` against CI's argv parsed from `ci.yml`, and `PARITY_EXCLUSIONS` holds seven named entries, each driven by its own test; Step 2–3's recipe fetches `origin/main` first, resolves both refs once, refuses a HEAD that moved while the guard ran, and prints the checked sha for the carrier to push by name; Step 4's row is registered as `"C-HE-32/33 §3"` (the §4 measure moved to C-HE-28 §4 per the Rev line). Review: codex r1–r12 with one gemini failover, merge-gate lens rounds 1–6 — 28 findings, 28 adjudicated (25 accepted, 3 rejected). A tick here means the step was carried out — never that the sketch is what shipped or that the Scope's parity guarantee is fully met: B-246 records, measured, that parity is false in CI's two-parent merge checkout while the landed witness drives the one-parent shape. Residual rows: B-247 (C-HE-27 spans keep only round 1) is registered on PR #1532; B-245 (C-HE-28 §4 outcome-measure cohorts unowned) and B-246 are drafted and owed — held behind the unmerged U-HE-40 branch (B-244), not yet on the register.
+
+- [x] **Step 1: Test**
 ```python
 def test_local_ci_parity(tmp_path, monkeypatch):
     """Same SHA: CI-shaped and local-shaped invocations → identical finding codes (named exclusions only)."""
@@ -7464,7 +7470,7 @@ def test_local_ci_parity(tmp_path, monkeypatch):
     assert codes(ci) - EXCLUDED == codes(local) - EXCLUDED
     assert EXCLUDED == {"OPEN_PRS_UNAVAILABLE"}   # gh-dependent: named, not silently dropped
 ```
-- [ ] **Step 2–3:** RED; recipe:
+- [x] **Step 2–3:** RED; recipe:
 ```make
 # C-HE-33: CI-shaped invocation of the guard (explicit refs, roadmap-drift tolerated as on main's push run).
 codex-context-check-ci:
@@ -7473,7 +7479,7 @@ codex-context-check-ci:
 `ship-pr`: *"Before the single push: `just codex-context-check-ci` (parity with CI's guard job — converge locally, push once)."* The outcome measure (≥ 6-CI-run branch share; CANCELLED share) is tracked under **C-HE-28 §4**, NOT built here — see `.harness/class_1_fork_c_he_33_outcome_measure_mandates_an_input_that_does_not_exist.md`.
 
 **Rev 2026-09-15 (U-HE-42 execution correction, as-built — Class 1 fork ratified under Reading C).** This line previously read *"Track the outcome measure … as two lines in `summary` (`arc_metrics.py`) over `ci_runs` (already on the row) — no new store"*, which is unsatisfiable as written and contradicted this unit's own `**Spec linkage.**` line above (*"outcome measure via C-HE-28 cohorts"*). Both named inputs fail at HEAD: `ci_runs` is `len(hit)` from `ci_metrics(row.merge_sha)` (`tools/arc_metrics.py:698`, `:562-574`) — runs on the MERGE COMMIT, so there is no branch-level denominator for a "share of branches burning ≥ 6 CI runs"; and `conclusion` is fetched (`:558`) but used only to filter timings (`:569`) and never persisted, so a CANCELLED share is not derivable (`ci_runs − len(ci_wall_s)` yields NON-GREEN, conflating CANCELLED with `failure` — a distinction C-HE-19 §1 makes load-bearing). Repairing either requires a new captured field, which the same sentence forbade. Resolved by reconciling this line to `:7452` and to spec C-HE-33 §4, whose own words place the two shares as "the tracked cohorts (**C-HE-28**)": the measure belongs to C-HE-28's owner, and U-HE-42 owes only the parity half (C-HE-33's Verification names exactly one witness, the parity test — built and green). Tracking row: **B-245**, re-scoped to C-HE-28 §4.
-- [ ] **Step 4:** Register `Row("C-HE-32/33", "pytest:tools/test_codex_context_guard.py::test_local_ci_parity", "layer2", "CI", False)`. Commit `feat(he-lanes): U-HE-42 codex-context-check-ci parity recipe + parity test (C-HE-33)`.
+- [x] **Step 4:** Register `Row("C-HE-32/33", "pytest:tools/test_codex_context_guard.py::test_local_ci_parity", "layer2", "CI", False)`. Commit `feat(he-lanes): U-HE-42 codex-context-check-ci parity recipe + parity test (C-HE-33)`.
 
 ---
 
