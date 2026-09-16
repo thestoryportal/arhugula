@@ -8,11 +8,11 @@
 
 | Field | Value |
 |---|---|
-| `workspace_state_hash` | `620993921d14` |
-| `last_refreshed` | 2026-09-15T00:00:00Z |
-| `git_head` | `248aa364` —  |
+| `workspace_state_hash` | `e9fca69ce075` |
+| `last_refreshed` | 2026-09-16T00:00:00Z |
+| `git_head` | `107e5533` —  |
 | `latest_retirement_batch` | `.harness/phase-7d-retirement-events-batch-57.md` |
-| `open_fork_doc_count` | 120 |
+| `open_fork_doc_count` | 121 |
 
 **Hash recipe.** `sha256(git_head[:8] + "|" + sorted_open_pr_csv + "|" + open_fork_doc_count + "|" + latest_retirement_batch_path)[:12]`. See `Project_Roadmap_v1.md` §7.1.
 
@@ -22,7 +22,7 @@
 
 **Purpose.** Live pointer to the next Claude/Codex-executable frontier. Full round-by-round history (every prior round, verbatim, most-recent-first) lives in the archive below — grep it by PR/`B-`/`R-`-id/round, never read wholesale.
 
-**Current next action (post-#1528).** #1528 pins every out-of-family Codex review invocation to `gpt-5.6-sol` at medium reasoning effort (operator direction 2026-09-15, token cost): `CODEX_OVERRIDES` in `tools/codex_review.py`, `tools/hooks/resolve_lib.sh`, the `codex-review-uncommitted` recipe, the Codex merge-gate lens call in `.agents` and `.codex/notes/merge-gate-lenses/README.md`, and the isolated-exec shape in the 31 `.agents` bridges, and the permission guard now requires both pins on an isolated lens call and refuses any other `-c`. Before it, every review inherited `~/.codex/config.toml`'s `gpt-6-astra` at high; the first review through the pinned wrapper recorded `gpt-5.6-sol`/`medium` in its rollout. Three things follow. The next implementable unit is `U-HE-42`. FIRST, #1527 (U-HE-42, `codex-context-check-ci` parity recipe) is mid merge-gate: round 1 recorded concurrency BLOCK, spec APPROVE, witness BLOCK at `1753f5869`, all three findings were fixed and adjudicated accepted (`f922a2f6f`, `b47510f46`), and its branch still carries the unpinned wrapper, so it rebases onto this `main` before its Codex round 4 and a merge-gate re-run; the operator approved shipping it over the disjointness refusal on the append-only `.harness/merge-gate-log.jsonl`. SECOND, U-HE-40 stays on its branch in the root checkout with a +2 budget extension recorded 2026-09-15 at the operator's direction; it also rebases onto this `main`, then owes a fresh sweep before its round 11. THIRD, still owed: the forward-register row drafted as B-245 (C-HE-33 §4's outcome measure has no input on the arc-metrics row) and a row for the disjointness gate refusing any two concurrently reviewed lanes on the append-only gate log, both blocked while U-HE-40's branch holds its own register rows; the plan checkbox ticks for U-HE-38/39/42 as a doc-only PR; spec C-HE-01 §1's `two-lane/SKILL.md:8` quote, its `:140-142` pilot-bar cite, and C-HE-33 §3's `ci.yml:536-542` cite are stale; `preflight-grep.sh` prints `sed: RE error: illegal byte sequence` on UTF-8 diffs; `test_codex_workflow_parity.py`'s `".claude" in str(path)` branch reds in any checkout under `.claude/`, and `test_rtk_shape_guard.sh` reds against the installed rtk, both on clean `main`; `u-he-26` stays queued; B-203 step (3) waits on a guard-admitted git invocation shape; and U-HE-37 Step 5 remains blocked on the operator-gated `just main-protection-apply`. Then U-HE-43 (`tools/shadow_trial.py`), after #1527 lands.
+**Current next action (post-#1527).** The next implementable unit is U-HE-39 (§4 queue). Before it, two doc-only debts from the U-HE-42 close: (1) plan checkbox ticks for U-HE-38, U-HE-39 and U-HE-42 in Implementation_Plan_HE_Loop_Lanes_v1.md; (2) the B-245 (C-HE-28 §4 outcome-measure cohorts UNOWNED) and B-246 (measured C-HE-33 §3 parity break in CI's two-parent checkout) forward-register rows, whose texts live in the C-HE-33 fork doc on main and the #1527 body, once U-HE-40 (held unmerged, B-244) lands or is abandoned -- every register row conflicts textually with that branch.
 
 **Archive.** `.harness/roadmap-next-action-archive.md` (PRIOR rounds only, verbatim as each stood when superseded — the current round lives only in this head; the newest superseded round may lag there until the next content PR archives it, and is always losslessly recoverable from this file's own git history meanwhile).
 
@@ -43,8 +43,6 @@
 | PR | Branch | R-NNN | Posture |
 |---|---|---|---|
 | #1292 | `fix/codex-hook-contract-recovery` | — | — |
-| #1527 | `feat/u-he-42-codex-context-ci-parity` | — | — |
-| #1529 | `roadmap-refresh-post-1528` | — | — |
 
 ---
 
@@ -52,11 +50,11 @@
 
 | R-NNN / PR | Closed at | Notes |
 |---|---|---|
+| PR #1527 | 2026-09-16 | U-HE-42 (C-HE-33 §3 parity recipe, PR #1527, merge 107e5533) landed after the DESIGN/IMPL split: #1530 (merge 100733c4) carried the C-HE-33 §4 Class 1 fork ratified under Reading C, the B-246 addendum, the plan amendment at :7473/:7838 and its as-built clearance marker. 28 findings / 28 adjudicated (25 accepted, 3 rejected) across codex r1-r12, one gemini failover and merge-gate lens rounds 1-6; both main post-merge runs green (35053346583; the 107e5533 run pending at refresh time). Owed: B-245 and B-246 register rows (blocked on the held U-HE-40 branch, B-244) and plan checkbox ticks for U-HE-38/39/42 as a doc-only PR. |
 | PR #1528 | 2026-09-15 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1525 | 2026-09-14 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1523 | 2026-09-05 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1521 | 2026-09-04 | B-235 operator-facing half: --detail renders the canonical close_out above the prose copy; B-236 registered; arc ended on round budget, not convergence |
-| PR #1519 | 2026-09-04 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 
 ---
 
