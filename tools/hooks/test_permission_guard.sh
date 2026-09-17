@@ -440,6 +440,28 @@ OUT=$(run_on "$(pl Bash "just arc-close 1503 b897542dc cp.md --arc-id b-230-task
 [ "$(dec "$OUT")" != "allow" ] && ok "arc-close with an out-of-worktree transcript → ask" || bad "out-of-worktree arc-close auto-allowed: $OUT"
 OUT=$(run_on "$(pl Bash "just merge-gate-emit --pr 1 --lens merge-gate-concurrency --verdict-json /tmp/outside.txt" '')")
 [ "$(dec "$OUT")" != "allow" ] && ok "merge-gate-emit reading a verdict file outside the worktree → not auto-allowed" || bad "out-of-worktree merge-gate-emit auto-allowed: $OUT"
+
+# U-HE-43 (C-HE-29): the three shadow-trial recipes are exact-shape allowed with their own
+# arity; a surplus token (a chained second recipe) or an off-enum disposition stays at ask.
+for cmd in \
+  "just shadow-trial-score" \
+  "just shadow-trial-score main" \
+  "HARNESS_ARC_ID=u-he-43 HARNESS_LANE_ID=lane-1 just shadow-trial-score" \
+  "just shadow-trial-decide gemini-shadow" \
+  "just shadow-trial-decide gemini-shadow --hitl" \
+  "just shadow-trial-adjudicate gemini-shadow:abc123:0123456789ab:1 accepted operator" \
+  "just shadow-trial-adjudicate gemini-shadow:abc123:0123456789ab:2 rejected codex-review"; do
+  OUT=$(run_on "$(pl Bash "$cmd" '')")
+  [ "$(dec "$OUT")" = "allow" ] && ok "shadow-trial shape allowed: $cmd" || bad "shadow-trial shape NOT allowed: $cmd → $OUT"
+done
+for cmd in \
+  "just shadow-trial-score main codex-worktree-gc" \
+  "just shadow-trial-decide gemini-shadow --hitl arc-close" \
+  "just shadow-trial-adjudicate gemini-shadow:abc123:0123456789ab:1 approved operator" \
+  "just shadow-trial-adjudicate gemini-shadow:abc123:0123456789ab:1 accepted operator extra"; do
+  OUT=$(run_on "$(pl Bash "$cmd" '')")
+  [ "$(dec "$OUT")" != "allow" ] && ok "shadow-trial off-shape → not auto-allowed: $cmd" || bad "shadow-trial off-shape auto-allowed: $cmd"
+done
 # B-230 Task 5: emit-all rides the same alternation; one out-of-worktree verdict path
 # among the three drops the whole call to ask, exactly as the single-lens form does.
 OUT=$(run_on "$(pl Bash "just merge-gate-emit-all --pr 1 --arc-id b-230-task-5 --concurrency-json .harness/tmp/c.txt --spec-json /tmp/outside.txt --witness-json .harness/tmp/w.txt" '')")

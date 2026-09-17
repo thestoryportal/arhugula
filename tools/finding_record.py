@@ -406,6 +406,33 @@ def append_observations(
     return written
 
 
+def append_derived(
+    build: Callable[[list[dict]], dict | None], path: Path | None = None
+) -> dict | None:
+    """Append ONE row that a caller derives from the log as it stands under the lock, keeping its
+    `finding_id` (an adjudication of an existing finding, not a new observation). `build(rows)`
+    returns the complete row, or None to append nothing. The derivation and the append are one
+    critical section, so a fact the row asserts about the log (e.g. "no blocking reviewer has
+    reported this key") cannot be invalidated by a row landing between the read and the write
+    (U-HE-43 codex round 1). Returns the row as written, or None."""
+    path = path or GATE_LOG_JSONL
+    written: dict | None = None
+
+    def body(fd: int) -> None:
+        nonlocal written
+        rows = _read_rows_fd(fd, path)
+        row = build(rows)
+        if row is None:
+            return
+        validate(row)
+        _check_against_prior_rows(row, rows)
+        _append_line(fd, _encode(row), path)
+        written = row
+
+    _under_log_lock(path, body)
+    return written
+
+
 def _append_line(fd: int, data: bytes, path: Path) -> None:
     """ONE `os.write` syscall on the O_APPEND fd -- not a buffered TextIO write that may split a
     long line across syscalls. C-HE-23 §2's "single write under PIPE_BUF" is not literally

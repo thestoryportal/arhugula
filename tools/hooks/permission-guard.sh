@@ -894,6 +894,16 @@ if [ "$TOOL" = "Bash" ] && [ -n "$CMD" ]; then
     elif printf '%s' "$TRIM" | grep -Eq '^just[[:space:]]+lanes-pilot(-report)?[[:space:]]+[A-Za-z0-9._-]+[[:space:]]*$' \
        && _bash_args_safe "$CMD"; then
       emit_allow
+    # U-HE-43 (C-HE-29): the shadow-trial recipes ship-pr runs unattended after the blocking
+    # chain. End-anchored with the recipe's own arity so no trailing token can chain a second
+    # recipe (the B-215 class): `score [<base>]`, `decide <lens> [--hitl]`,
+    # `adjudicate <finding_id> accepted|rejected|suppressed <actor>` (a finding_id carries
+    # `:`; the actor is a bareword). `score` runs the gemini wrapper as a SHADOW (no gate
+    # admission, no reservation round, `|| true`); `adjudicate` appends one gate-log row —
+    # the same authority class as `merge-gate-emit` above.
+    elif printf '%s' "$TRIM" | grep -Eq '^just[[:space:]]+shadow-trial-(score([[:space:]]+[A-Za-z0-9._/-]+)?|decide[[:space:]]+[A-Za-z0-9._-]+([[:space:]]+--hitl)?|adjudicate[[:space:]]+[A-Za-z0-9._:-]+[[:space:]]+(accepted|rejected|suppressed)[[:space:]]+[A-Za-z0-9._-]+)[[:space:]]*$' \
+       && _bash_args_safe "$CMD"; then
+      emit_allow
     # B-230 Task 3: `just arc-close <pr> <sha> <checkpoint> [queue args…]` is the close-out
     # tail ship-pr runs unattended (exit report + arc-metrics queue). It rides the generic
     # `just` verb alternation below like every other allowlisted recipe: the recipe's
