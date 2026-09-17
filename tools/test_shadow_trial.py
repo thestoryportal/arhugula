@@ -342,7 +342,96 @@ def test_decision_is_delivered_once_per_frozen_sample(
     fr.append_row(_row(31, LENS, kind="no_finding", location="gemini", n=31), p)
     assert st.deliver_decision(LENS, p)["delivered"] is False and len(seen) == 1
     markers = [r for r in fr.read_rows(p) if r["finding_type"] == st.DECISION_TYPE]
-    assert len(markers) == 1 and "decision: kill" in markers[0]["observed_evidence"]
+    assert len(markers) == 1 and "decision=kill" in markers[0]["observed_evidence"]
+
+
+# mutation-probe: drop n/threshold/decision from delivery_identity (key on the sample only)
+def test_an_amended_threshold_is_a_new_proposal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """amend-threshold is a permitted response: after it, the same frozen sample with the new
+    rule (and possibly a new outcome) is delivered again; the same rule is not (codex r4 P2)."""
+    p = tmp_path / "g.jsonl"
+    for r in _markers(30):
+        fr.append_row(r, p)
+    fr.append_row(_row(7, LENS, location="one", uc=True), p)
+    fr.append_row(_adj(7, "one", "accepted", ts="2026-08-18T00:00:08Z"), p)
+    seen: list[tuple] = []
+    monkeypatch.setattr(st, "_emit_loop_row", lambda *a: seen.append(a))
+    assert st.deliver_decision(LENS, p)["decision"] == "kill" and len(seen) == 1
+    assert st.deliver_decision(LENS, p)["delivered"] is False and len(seen) == 1
+    fr.append_row(st.config_row(lens=LENS, rows=fr.read_rows(p), threshold=1), p)  # amend
+    d = st.deliver_decision(LENS, p)
+    assert d["decision"] == "keep" and d["delivered"] is True and len(seen) == 2
+    assert "threshold=1" in seen[1][3] and "KEEP" in seen[1][3]
+    assert st.deliver_decision(LENS, p)["delivered"] is False and len(seen) == 2
+
+
+# mutation-probe: append the decision marker before hitl_request (mark-then-emit)
+def test_a_failed_delivery_leaves_no_marker_and_is_retried(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """The marker means DELIVERED: it is written only after the HITL row is emitted, so a
+    failed emission leaves nothing behind and the next run emits again (codex r4 P2)."""
+    p = tmp_path / "g.jsonl"
+    for r in _markers(30):
+        fr.append_row(r, p)
+
+    def boom(*a):
+        raise RuntimeError("loop ledger unavailable")
+
+    monkeypatch.setattr(st, "_emit_loop_row", boom)
+    with pytest.raises(RuntimeError):
+        st.deliver_decision(LENS, p)
+    assert not [r for r in fr.read_rows(p) if r["finding_type"] == st.DECISION_TYPE]
+    seen: list[tuple] = []
+    monkeypatch.setattr(st, "_emit_loop_row", lambda *a: seen.append(a))
+    assert st.deliver_decision(LENS, p)["delivered"] is True and len(seen) == 1
+    assert len([r for r in fr.read_rows(p) if r["finding_type"] == st.DECISION_TYPE]) == 1
+
+
+# mutation-probe: append the request marker before _emit_loop_row (mark-then-emit)
+def test_a_failed_request_emission_is_retried_next_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    p = tmp_path / "g.jsonl"
+    a = _row(1, LENS, location="a")
+    fr.append_row(a, p)
+
+    def boom(*x):
+        raise RuntimeError("loop ledger unavailable")
+
+    monkeypatch.setattr(st, "_emit_loop_row", boom)
+    with pytest.raises(RuntimeError):
+        st.request_adjudications(LENS, p)
+    assert not [r for r in fr.read_rows(p) if r["finding_type"] == st.REQUEST_TYPE]
+    seen: list[tuple] = []
+    monkeypatch.setattr(st, "_emit_loop_row", lambda *x: seen.append(x))
+    assert [f["finding_id"] for f in st.request_adjudications(LENS, p)] == [a["finding_id"]]
+    assert len(seen) == 1
+    assert len([r for r in fr.read_rows(p) if r["finding_type"] == st.REQUEST_TYPE]) == 1
+
+
+def test_decision_is_computed_from_the_rows_under_the_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """A row that lands by lock time (here: injected at the locked read) is part of the
+    delivered decision; the proposal never describes a stale snapshot (codex r4 P2)."""
+    p = tmp_path / "g.jsonl"
+    for r in _markers(30):
+        fr.append_row(r, p)
+    fr.append_row(_row(7, LENS, location="one", uc=True), p)
+    fr.append_row(_adj(7, "one", "accepted", ts="2026-08-18T00:00:08Z"), p)
+    real_read = fr._read_rows_fd
+
+    def read_with_late_config(fd: int, path: Path) -> list[dict]:
+        rows = real_read(fd, path)
+        rows.append(st.config_row(lens=LENS, rows=rows, threshold=1))  # amendment lands late
+        return rows
+
+    monkeypatch.setattr(fr, "_read_rows_fd", read_with_late_config)
+    seen: list[tuple] = []
+    monkeypatch.setattr(st, "_emit_loop_row", lambda *x: seen.append(x))
+    d = st.deliver_decision(LENS, p)
+    assert d["decision"] == "keep" and d["threshold"] == 1 and "KEEP" in seen[0][3]
 
 
 # mutation-probe: drop the `already` filter in request_adjudications (re-request every run)
