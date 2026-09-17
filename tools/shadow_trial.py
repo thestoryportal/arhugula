@@ -160,28 +160,37 @@ def decide(
     logged_n, logged_threshold = rule_from_rows(rows, lens)
     n = logged_n if n is None else n
     threshold = logged_threshold if threshold is None else threshold
-    last = fr.reduce_last_by_finding_id(rows)
+    k = len(scored_rounds(rows, lens))
+    sample = first_n_rounds(rows, lens, n) if k >= n else []
+    in_sample = set(sample)
+    counted_ids = {
+        c["finding_id"]
+        for c in unique_catches(rows, lens)
+        if k < n or (c["arc_id"], c["round_n"]) in in_sample
+    }
+    # Every lens finding carrying unique_catch, each marked with WHY it did or did not count,
+    # so the HITL evidence is the population the decision used (codex r2 P2).
+    blocking = _blocking_keys(rows)
     catches = [
         {
             "finding_id": r["finding_id"],
             "arc_id": r["arc_id"],
             "round_n": r["round_n"],
             "disposition": r.get("disposition"),
+            "in_sample": k < n or (r["arc_id"], r["round_n"]) in in_sample,
+            "blocked": (r["head_sha"], r["location"], r["finding_type"]) in blocking,
+            "counted": r["finding_id"] in counted_ids,
         }
-        for r in last.values()
+        for r in fr.reduce_last_by_finding_id(rows).values()
         if r["producer"] == lens and r.get("unique_catch")
     ]
-    k = len(scored_rounds(rows, lens))
     base = {"n": n, "threshold": threshold, "scored": k, "catches": catches}
     if k < n:
-        return {**base, "unique": len(unique_catches(rows, lens)), "decision": "pending"}
-    sample = first_n_rounds(rows, lens, n)
-    in_sample = set(sample)
-    u = sum(1 for c in unique_catches(rows, lens) if (c["arc_id"], c["round_n"]) in in_sample)
+        return {**base, "unique": len(counted_ids), "decision": "pending"}
     return {
         **base,
-        "unique": u,
-        "decision": "kill" if u < threshold else "keep",
+        "unique": len(counted_ids),
+        "decision": "kill" if len(counted_ids) < threshold else "keep",
         "sample": sample,
     }
 
@@ -290,9 +299,20 @@ def hitl_request(decision: dict, lens: str) -> None:
     the three permitted responses; nothing is adopted or killed here."""
     sample = decision.get("sample", [])
     rounds = ", ".join(f"{a}/r{r}" for a, r in sample) or "(none)"
+
+    def why(c: dict) -> str:
+        if c["counted"]:
+            return "COUNTED"
+        if not c["in_sample"]:
+            return "not counted: outside the frozen sample"
+        if c["blocked"]:
+            return "not counted: a blocking reviewer reported the same key"
+        return f"not counted: last disposition {c['disposition'] or 'undisposed'}"
+
     catches = (
         "; ".join(
-            f"{c['finding_id']}@{c['arc_id']}/r{c['round_n']}={c['disposition'] or 'undisposed'}"
+            f"{c['finding_id']}@{c['arc_id']}/r{c['round_n']}={c['disposition'] or 'undisposed'} "
+            f"[{why(c)}]"
             for c in decision.get("catches", [])
         )
         or "(no unique_catch rows)"

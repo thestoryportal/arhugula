@@ -831,7 +831,7 @@ gemini-review base='main' outcome_json='':
 # `shadow-trial-adjudicate` — the ONE writer of `unique_catch`; `shadow-trial-decide` is the
 # read-only kill/keep reducer, `--hitl` delivering a non-pending decision as a DEFERRED-HIL row.
 shadow-trial-score base='main':
-    uv run python tools/shadow_trial.py config --lens gemini-shadow --if-absent
+    uv run python tools/shadow_trial.py config --lens gemini-shadow --if-absent || true
     HARNESS_SHADOW_LENS=1 just gemini-review {{base}} || true
 
 shadow-trial-decide lens='gemini-shadow' *ARGS:

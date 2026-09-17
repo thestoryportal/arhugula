@@ -78,7 +78,8 @@ clean), no gate admission, no reservation round, no budget spend, and its exit n
 Dispose each shadow finding with `just shadow-trial-adjudicate <finding_id>
 accepted|rejected|suppressed <actor>` where the actor is the operator or a third-party identity
 of NEITHER family under trial (never a gemini or Claude identity); it is the only writer of
-`unique_catch`. Then `just shadow-trial-decide gemini-shadow --hitl`: pending until 30 scored
+`unique_catch` and is never guard-allowed in loop mode (a headless run must not dispose
+findings as the operator). Then `just shadow-trial-decide gemini-shadow --hitl`: pending until 30 scored
 rounds, then kill iff fewer than 2 unique catches; a non-pending decision lands as a
 `DEFERRED-HIL` row answered with approve-kill | reject-keep | amend-threshold.
 

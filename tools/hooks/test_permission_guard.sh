@@ -441,24 +441,25 @@ OUT=$(run_on "$(pl Bash "just arc-close 1503 b897542dc cp.md --arc-id b-230-task
 OUT=$(run_on "$(pl Bash "just merge-gate-emit --pr 1 --lens merge-gate-concurrency --verdict-json /tmp/outside.txt" '')")
 [ "$(dec "$OUT")" != "allow" ] && ok "merge-gate-emit reading a verdict file outside the worktree → not auto-allowed" || bad "out-of-worktree merge-gate-emit auto-allowed: $OUT"
 
-# U-HE-43 (C-HE-29): the three shadow-trial recipes are exact-shape allowed with their own
-# arity; a surplus token (a chained second recipe) or an off-enum disposition stays at ask.
+# U-HE-43 (C-HE-29): the two unattended shadow-trial recipes are exact-shape allowed with
+# their own arity; a surplus token (a chained second recipe) stays at ask, and
+# `shadow-trial-adjudicate` — the operator's act, the writer of `unique_catch` — is never
+# auto-allowed in any shape (codex r2 P2).
 for cmd in \
   "just shadow-trial-score" \
   "just shadow-trial-score main" \
   "HARNESS_ARC_ID=u-he-43 HARNESS_LANE_ID=lane-1 just shadow-trial-score" \
   "just shadow-trial-decide gemini-shadow" \
-  "just shadow-trial-decide gemini-shadow --hitl" \
-  "just shadow-trial-adjudicate gemini-shadow:abc123:0123456789ab:1 accepted operator" \
-  "just shadow-trial-adjudicate gemini-shadow:abc123:0123456789ab:2 rejected codex-review"; do
+  "just shadow-trial-decide gemini-shadow --hitl"; do
   OUT=$(run_on "$(pl Bash "$cmd" '')")
   [ "$(dec "$OUT")" = "allow" ] && ok "shadow-trial shape allowed: $cmd" || bad "shadow-trial shape NOT allowed: $cmd → $OUT"
 done
 for cmd in \
   "just shadow-trial-score main codex-worktree-gc" \
   "just shadow-trial-decide gemini-shadow --hitl arc-close" \
-  "just shadow-trial-adjudicate gemini-shadow:abc123:0123456789ab:1 approved operator" \
-  "just shadow-trial-adjudicate gemini-shadow:abc123:0123456789ab:1 accepted operator extra"; do
+  "just shadow-trial-adjudicate gemini-shadow:abc123:0123456789ab:1 accepted operator" \
+  "just shadow-trial-adjudicate gemini-shadow:abc123:0123456789ab:2 rejected codex-review" \
+  "HARNESS_ARC_ID=u-he-43 HARNESS_LANE_ID=lane-1 just shadow-trial-adjudicate gemini-shadow:abc123:0123456789ab:1 accepted operator"; do
   OUT=$(run_on "$(pl Bash "$cmd" '')")
   [ "$(dec "$OUT")" != "allow" ] && ok "shadow-trial off-shape → not auto-allowed: $cmd" || bad "shadow-trial off-shape auto-allowed: $cmd"
 done

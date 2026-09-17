@@ -288,13 +288,25 @@ def test_hitl_request_presents_the_sample_and_every_disposition(monkeypatch: pyt
     rows.append(_adj(5, "a", "accepted"))
     rows.append(_row(12, LENS, location="b", uc=True))
     rows.append(_adj(12, "b", "rejected"))
+    rows.append(_row(20, LENS, location="c", uc=True))
+    rows.append(_adj(20, "c", "accepted"))
+    rows.append(_row(20, "codex_review_wrapper", location="c"))  # blocked
+    rows.append(_row(31, LENS, location="d", uc=True))
+    rows.append(_adj(31, "d", "accepted"))  # accepted but outside the frozen sample
     d = st.decide(rows, LENS)
+    assert d["unique"] == 1 and d["decision"] == "kill"
+    by_loc = {c["finding_id"]: c for c in d["catches"]}
+    assert [c["counted"] for c in d["catches"]].count(True) == 1
+    assert len(by_loc) == 4  # every unique_catch row is presented, each with its reason
     st.hitl_request(d, LENS)
     ((kind, _lane, cause, detail),) = seen
     assert kind == "DEFERRED-HIL" and cause.startswith("shadow-trial-adjudicate")
-    assert "n=30" in detail and "unique=1" in detail and "KILL" in detail
+    assert "n=31" in detail and "unique=1" in detail and "KILL" in detail
     assert "pr-1/r1" in detail and "pr-1/r30" in detail
-    assert "/r5=accepted" in detail and "/r12=rejected" in detail
+    assert "/r5=accepted [COUNTED]" in detail
+    assert "/r12=rejected [not counted: last disposition rejected]" in detail
+    assert "/r20=accepted [not counted: a blocking reviewer reported the same key]" in detail
+    assert "/r31=accepted [not counted: outside the frozen sample]" in detail
     assert "approve-kill" in detail and "reject-keep" in detail and "amend-threshold" in detail
 
 

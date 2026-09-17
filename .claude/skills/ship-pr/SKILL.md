@@ -131,7 +131,9 @@ canonical §12 protocol** rather than re-stating it — the recipe lives in CLAU
   admission, no reservation round). Each shadow finding is disposed by the operator or a
   third-party identity of NEITHER family under trial (never a gemini or Claude identity):
   `just shadow-trial-adjudicate <finding_id> accepted|rejected|suppressed <actor>` — the ONLY
-  writer of `unique_catch`. Then `just shadow-trial-decide gemini-shadow --hitl`: `pending`
+  writer of `unique_catch`, and deliberately NOT guard-allowed in loop mode (it is the
+  operator's act; a headless run must not dispose findings under `--actor operator`).
+  Then `just shadow-trial-decide gemini-shadow --hitl`: `pending`
   until 30 scored rounds; at 30, `kill` iff fewer than 2 unique catches (OC: `just
   shadow-trial-decide gemini-shadow` prints nothing about it — `uv run python
   tools/shadow_trial.py oc` does). A non-pending decision lands as a `DEFERRED-HIL` row the
