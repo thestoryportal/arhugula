@@ -125,7 +125,9 @@ canonical §12 protocol** rather than re-stating it — the recipe lives in CLAU
   pre-commit review in a CLEAN tree only.
 - **Shadow trial, off-path (U-HE-43; C-HE-29).** After the blocking chain has reached its
   terminal for this head, run the second reviewer's lens as a SHADOW — it never blocks and
-  never spends the arc's review budget:
+  never spends the arc's review budget. The shadow lens (gemini) must DIFFER from the
+  blocking reviewer (codex on this Claude-authored path); the Codex carrier, where Gemini
+  already blocks, does not run it (codex r5 P2):
   `HARNESS_ARC_ID=<arc-id> HARNESS_LANE_ID=<lane-id> just shadow-trial-score`
   (rows land under `producer=gemini-shadow`, one `no_finding` marker when clean; no gate
   admission, no reservation round). Each shadow finding is disposed by the operator or a

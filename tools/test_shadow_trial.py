@@ -313,7 +313,7 @@ def test_hitl_request_presents_the_sample_and_every_disposition(monkeypatch: pyt
     st.hitl_request(d, LENS)
     ((kind, _lane, cause, detail),) = seen
     assert kind == "DEFERRED-HIL" and cause.startswith("shadow-trial-adjudicate")
-    assert "n=31" in detail and "unique=1" in detail and "KILL" in detail
+    assert "n=30 scored=31" in detail and "unique=1" in detail and "KILL" in detail
     assert "pr-1/r1" in detail and "pr-1/r30" in detail
     assert "/r5=accepted [COUNTED]" in detail
     assert "/r12=rejected [not counted: last disposition rejected]" in detail
@@ -408,6 +408,37 @@ def test_a_failed_request_emission_is_retried_next_run(
     assert [f["finding_id"] for f in st.request_adjudications(LENS, p)] == [a["finding_id"]]
     assert len(seen) == 1
     assert len([r for r in fr.read_rows(p) if r["finding_type"] == st.REQUEST_TYPE]) == 1
+
+
+# mutation-probe: collect every pending finding into one build (batch markers after all emissions)
+def test_a_marker_persists_per_finding_before_the_next_emission(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """A delivered finding is remembered even when a LATER finding's emission fails: its marker
+    is on disk before the next emission is attempted, so the retry emits only the finding that
+    never reached the operator (codex r5 P3)."""
+    p = tmp_path / "g.jsonl"
+    a = _row(1, LENS, location="a")
+    b = _row(1, LENS, location="b")
+    fr.append_row(a, p)
+    fr.append_row(b, p)
+    seen: list[tuple] = []
+
+    def second_fails(*x):
+        seen.append(x)
+        if len(seen) == 2:
+            raise RuntimeError("loop ledger unavailable")
+
+    monkeypatch.setattr(st, "_emit_loop_row", second_fails)
+    with pytest.raises(RuntimeError):
+        st.request_adjudications(LENS, p)
+    markers = [r["location"] for r in fr.read_rows(p) if r["finding_type"] == st.REQUEST_TYPE]
+    assert markers == [a["finding_id"]]
+    monkeypatch.setattr(st, "_emit_loop_row", lambda *x: seen.append(x))
+    assert [f["finding_id"] for f in st.request_adjudications(LENS, p)] == [b["finding_id"]]
+    assert len(seen) == 3
+    markers = [r["location"] for r in fr.read_rows(p) if r["finding_type"] == st.REQUEST_TYPE]
+    assert markers == [a["finding_id"], b["finding_id"]]
 
 
 def test_decision_is_computed_from_the_rows_under_the_lock(

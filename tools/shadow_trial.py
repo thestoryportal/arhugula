@@ -18,6 +18,12 @@ Vocabulary (C-HE-24 §2, C-HE-29 §2):
 - the RULE (n, threshold) is read from the lens's LAST config row on the log when one exists,
   so an amendment is itself a row and the decision stays reproducible from rows alone.
 
+The trial's authorship premise: the diff under review is Claude-authored, so the blocking
+reviewer is codex and the gemini shadow lens is a SECOND family. Where Gemini is already the
+blocking reviewer (a Codex-authored change; `just gemini-review` on the blocking path) there is
+no second family to measure and the carriers do not run the shadow (codex r5 P2) — which is also
+why MODEL_FAMILIES names gemini and anthropic, never openai, as the families under trial.
+
 `adjudicate` is the ONE production writer of `unique_catch` for the lens ([LAW:single-enforcer]);
 it derives the value and appends under the same log lock ([LAW:no-ambient-temporal-coupling]).
 """
@@ -330,7 +336,8 @@ def hitl_request(decision: dict, lens: str) -> None:
         "DEFERRED-HIL",
         "shadow_trial",
         "shadow-trial-adjudicate:HITL-recoverable:kill_keep_decision",
-        f"SHADOW-{lens} — n={decision['scored']} unique={decision['unique']} "
+        f"SHADOW-{lens} — n={decision['n']} scored={decision['scored']} "
+        f"unique={decision['unique']} "
         f"threshold={decision['threshold']} → proposed {decision['decision'].upper()}; "
         f"sample rounds: {rounds}; unique_catch dispositions: {catches}; "
         "respond approve-kill | reject-keep | amend-threshold",
@@ -348,10 +355,13 @@ def delivery_identity(decision: dict) -> str:
     outcome. An amended threshold (the amend-threshold response) or a changed outcome is a
     new proposal and is delivered again (codex r4 P2)."""
     digest = sample_digest([tuple(x) for x in decision["sample"]])
-    return (
-        f"sample={digest} n={decision['n']} threshold={decision['threshold']} "
-        f"decision={decision['decision']}"
-    )
+    parts = [
+        f"sample={digest}",
+        f"n={decision['n']}",
+        f"threshold={decision['threshold']}",
+        f"decision={decision['decision']}",
+    ]
+    return " ".join(parts)
 
 
 def decision_recorded(rows: list[dict], lens: str, identity: str) -> bool:
@@ -429,34 +439,38 @@ def _request_row(f: dict, lens: str) -> tuple[dict, fr.Envelope]:
 def request_adjudications(lens: str, path: Path | None = None) -> list[dict]:
     """C-HE-29 §4: every shadow finding is handed to the operator as a `shadow-trial-adjudicate`
     HITL row, once — the request marker on the log is the memory (rows alone), so repeated
-    score runs never re-enqueue a finding (codex r3 P2). Per finding, the HITL row is emitted
-    FIRST and its marker appended only on success, so a failed emission is retried next run
-    rather than remembered as requested (codex r4 P2). Returns the findings requested."""
+    score runs never re-enqueue a finding (codex r3 P2). Each finding is its own critical
+    section: its HITL row is emitted FIRST and its marker appended before the NEXT finding is
+    attempted, so a failed emission is retried next run and a finding already delivered is
+    never re-emitted because a later one failed (codex r4 P2, r5 P3). Returns the findings
+    requested."""
     requested: list[dict] = []
 
-    def build(rows: list[dict]) -> list[tuple[dict, fr.Envelope]]:
+    def build_next(rows: list[dict]) -> list[tuple[dict, fr.Envelope]]:
         already = {
             r["location"]
             for r in rows
             if r["producer"] == CONFIG_PRODUCER and r["finding_type"] == REQUEST_TYPE
         }
-        pairs = []
-        for f in undisposed_findings(rows, lens):
-            if f["finding_id"] in already:
-                continue
-            _emit_loop_row(  # raises on failure -> this and later markers are not written
-                "DEFERRED-HIL",
-                "shadow_trial",
-                "shadow-trial-adjudicate:HITL-recoverable:per_finding_disposition",
-                f"SHADOW-{lens} finding {f['finding_id']} at {f['location']} ({f['severity']}) "
-                f"awaits an adjudicator of neither family: just shadow-trial-adjudicate "
-                f"{f['finding_id']} accepted|rejected|suppressed <actor>",
-            )
-            requested.append(f)
-            pairs.append(_request_row(f, lens))
-        return pairs
+        pending = [f for f in undisposed_findings(rows, lens) if f["finding_id"] not in already]
+        if not pending:
+            return []
+        f = pending[0]
+        _emit_loop_row(  # raises -> THIS marker unwritten; earlier ones already persisted
+            "DEFERRED-HIL",
+            "shadow_trial",
+            "shadow-trial-adjudicate:HITL-recoverable:per_finding_disposition",
+            f"SHADOW-{lens} finding {f['finding_id']} at {f['location']} ({f['severity']}) "
+            f"awaits an adjudicator of neither family: just shadow-trial-adjudicate "
+            f"{f['finding_id']} accepted|rejected|suppressed <actor>",
+        )
+        requested.append(f)
+        return [_request_row(f, lens)]
 
-    fr.append_observations(build, path)
+    # [LAW:no-ambient-temporal-coupling] the marker's persistence is owned by the same lock
+    # that emitted it; the next finding is only attempted once the previous marker is on disk.
+    while fr.append_observations(build_next, path):
+        pass
     return requested
 
 
