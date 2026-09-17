@@ -823,6 +823,22 @@ codex-review-uncommitted: _require-codex-subscription
 gemini-review base='main' outcome_json='':
     uv run python tools/agy_review.py --base {{base}} {{ if outcome_json != '' { '--outcome-json ' + quote(outcome_json) } else { '' } }}
 
+# ─── C-HE-29 shadow trial (U-HE-43) — the second reviewer's lens live, OFF the blocking path ──
+# `shadow-trial-score` runs the gemini wrapper as the shadow lens: rows land under
+# `producer=gemini-shadow` (one `no_finding` marker when clean), no gate admission, no
+# reservation round, no budget spend, and its exit never blocks (`|| true`). The operator (or
+# a third-party identity of NEITHER family under trial) disposes each shadow finding with
+# `shadow-trial-adjudicate` — the ONE writer of `unique_catch`; `shadow-trial-decide` is the
+# read-only kill/keep reducer, `--hitl` delivering a non-pending decision as a DEFERRED-HIL row.
+shadow-trial-score base='main':
+    HARNESS_SHADOW_LENS=1 just gemini-review {{base}} || true
+
+shadow-trial-decide lens='gemini-shadow' *ARGS:
+    uv run python tools/shadow_trial.py decide --lens {{lens}} {{ARGS}}
+
+shadow-trial-adjudicate finding_id disposition actor:
+    uv run python tools/shadow_trial.py adjudicate {{finding_id}} --disposition {{disposition}} --actor {{actor}}
+
 _require-antigravity:
     @if ! command -v agy >/dev/null 2>&1; then \
         echo "ERROR: agy (Antigravity CLI) not found on PATH."; \

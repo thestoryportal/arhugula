@@ -48,6 +48,7 @@ tools/test_concurrency_surface.py \
   tools/test_review_wrapper.py \
   tools/test_reviewer_concurrency_probe.py \
   tools/test_reservations.py \
+  tools/test_shadow_trial.py \
   tools/test_store_audit.py \
   tools/test_closure_certification.py \
   tools/test_compose_lanes.py \

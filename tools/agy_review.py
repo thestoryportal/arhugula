@@ -44,6 +44,20 @@ TERMINATION_GRACE_SECONDS = 5.0
 GEMINI_PROMPT_VERSION = "gemini-review-v2-json"
 CHANNEL = "gemini"
 PRODUCER = "gemini_review_wrapper"
+#: C-HE-29 (U-HE-43): under `HARNESS_SHADOW_LENS=1` this wrapper is the second reviewer's SHADOW
+#: lens — off the blocking path. Its rows carry a distinct producer so the review-loop gate's
+#: budget (LOOP_PRODUCERS) and the reservation's per-round outcomes never count them, and the
+#: `no_finding` marker `emit_outcome` writes for a clean terminal is the scored-round marker
+#: C-HE-29 §2 requires. Producer names are `:`-free identifiers (C-HE-24 §2).
+SHADOW_PRODUCER = "gemini-shadow"
+
+
+def shadow_lens() -> bool:
+    return os.environ.get("HARNESS_SHADOW_LENS") == "1"
+
+
+def producer_name() -> str:
+    return SHADOW_PRODUCER if shadow_lens() else PRODUCER
 
 
 def gemini_config_hash() -> str:
@@ -527,10 +541,10 @@ def _emit(outcome: rw.ReviewOutcome) -> None:
     (codex round 4)."""
     arc_id, lane_id = rw.env_arc_and_lane()
     written = rw.emit_outcome(
-        outcome, producer=PRODUCER, arc_id=arc_id, lane_id=lane_id, round_n=None
+        outcome, producer=producer_name(), arc_id=arc_id, lane_id=lane_id, round_n=None
     )  # the round is minted under the log lock (codex round 7); every terminal yields >= 1 row
     round_n = written[0]["round_n"]
-    if os.environ.get("HARNESS_FAILOVER_CHILD") != "1":
+    if os.environ.get("HARNESS_FAILOVER_CHILD") != "1" and not shadow_lens():
         # As a failover CHILD the reservation's C-HE-25 outcome is recorded by the PARENT
         # after it ACCEPTS the envelope (binding-matched): a parent-rejected envelope must
         # not leave the child's verdict standing as the arc's deciding leg while the caller
@@ -828,7 +842,10 @@ def main() -> int:
     # parent already admitted the round — marked by the same env the reservation-
     # outcome split keys on; in loop mode a hand-set marker cannot ride the guard's
     # exact-shape allowlist (only HARNESS_ARC_ID/LANE_ID prefixes are stripped).
-    if os.environ.get("HARNESS_FAILOVER_CHILD") != "1":
+    # The SHADOW lens (C-HE-29, U-HE-43) is off the blocking path by contract: it is launched
+    # after the blocking chain reached its terminal, its rows carry `producer=gemini-shadow`,
+    # which the gate's budget and obligations never count, so admission does not apply.
+    if os.environ.get("HARNESS_FAILOVER_CHILD") != "1" and not shadow_lens():
         import review_loop_gate as rlg
 
         decision = rlg.admit(Path.cwd(), args.base, rw.env_arc_and_lane()[0])

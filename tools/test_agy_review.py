@@ -1533,3 +1533,53 @@ def test_timed_out_stage_is_not_re_invoked(tmp_path: Path, monkeypatch: pytest.M
     monkeypatch.setattr(reviewer, "run_bounded", fake_run)
     assert reviewer.run_review(tmp_path, "main") == 2
     assert calls == 1
+
+
+def test_shadow_lens_rows_carry_the_shadow_producer_and_skip_the_reservation_round(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """C-HE-29 (U-HE-43): under HARNESS_SHADOW_LENS=1 this wrapper is the second reviewer's
+    SHADOW lens — rows carry `producer=gemini-shadow` and the reservation's per-round outcome
+    is NOT recorded (off the blocking path; the gate's budget never counts the producer)."""
+    reviewer = _reviewer_module()
+    monkeypatch.setattr(reviewer, "OUTCOME_SINK", tmp_path / "o.json")
+    seen: dict[str, str] = {}
+
+    def fake_emit(outcome, *, producer, arc_id, lane_id, round_n, **kw):
+        seen["producer"] = producer
+        return [{"round_n": 1}]
+
+    recorded: list[tuple] = []
+    monkeypatch.setattr(reviewer.rw, "emit_outcome", fake_emit)
+    monkeypatch.setattr(
+        reviewer.rw, "record_round_outcome_if_reserved", lambda *a, **k: recorded.append(a)
+    )
+    monkeypatch.delenv("HARNESS_FAILOVER_CHILD", raising=False)
+    monkeypatch.setenv("HARNESS_SHADOW_LENS", "1")
+    reviewer._emit(reviewer.rw.ReviewOutcome("APPROVE", "gemini", None, "", [], BINDING, "stdout"))
+    assert seen["producer"] == "gemini-shadow" and recorded == []
+    monkeypatch.delenv("HARNESS_SHADOW_LENS")
+    reviewer._emit(reviewer.rw.ReviewOutcome("APPROVE", "gemini", None, "", [], BINDING, "stdout"))
+    assert seen["producer"] == "gemini_review_wrapper" and len(recorded) == 1
+
+
+def test_shadow_lens_is_never_gate_admitted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The shadow lens is launched after the blocking chain's terminal and must not be refused
+    or counted by the review-loop gate; the blocking lens still is."""
+    reviewer = _reviewer_module()
+    admitted: list[tuple] = []
+
+    def fake_admit(*a, **k):
+        admitted.append(a)
+        return rlg.Inactive("test")
+
+    monkeypatch.setattr(rlg, "admit", fake_admit)
+    monkeypatch.setattr(reviewer, "run_review", lambda *a, **k: 0)
+    monkeypatch.setattr(sys, "argv", ["agy_review.py"])
+    monkeypatch.delenv("HARNESS_FAILOVER_CHILD", raising=False)
+    monkeypatch.setenv("HARNESS_SHADOW_LENS", "1")
+    assert reviewer.main() == 0
+    assert admitted == []
+    monkeypatch.delenv("HARNESS_SHADOW_LENS")
+    assert reviewer.main() == 0
+    assert len(admitted) == 1

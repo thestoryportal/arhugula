@@ -71,6 +71,17 @@ cannot catch defects introduced per round.
 A BLOCK means fix, add a regression witness where applicable, re-run local gates, and
 review the new diff again. Never count self-review by the authoring model as decorrelated.
 
+After the blocking chain reaches its terminal for this head, run the shadow trial off-path
+(U-HE-43; C-HE-29): `HARNESS_ARC_ID=<arc-id> HARNESS_LANE_ID=<lane-id> just
+shadow-trial-score` — rows land under `producer=gemini-shadow` (one `no_finding` marker when
+clean), no gate admission, no reservation round, no budget spend, and its exit never blocks.
+Dispose each shadow finding with `just shadow-trial-adjudicate <finding_id>
+accepted|rejected|suppressed <actor>` where the actor is the operator or a third-party identity
+of NEITHER family under trial (never a gemini or Claude identity); it is the only writer of
+`unique_catch`. Then `just shadow-trial-decide gemini-shadow --hitl`: pending until 30 scored
+rounds, then kill iff fewer than 2 unique catches; a non-pending decision lands as a
+`DEFERRED-HIL` row answered with approve-kill | reject-keep | amend-threshold.
+
 ## Commit, PR, and CI
 
 1. Commit the explicit staged scope and push the topic branch. This carrier does not run

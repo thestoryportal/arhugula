@@ -460,6 +460,22 @@ MANIFEST: list[Row] = [
     # C-HE-30 (U-HE-14)
     # spec §8.1: mutation-probe `—` (static doc witness; no deletion-expressible target)
     Row("C-HE-30", "pytest:tools/test_store_audit.py", "phase0", "local + CI", False),
+    # C-HE-29 (U-HE-43) — the shadow-trial kill rule is reproducible from rows alone, a later
+    # `rejected` never counts, and the OC table is recomputed by the test from the binomial.
+    Row(
+        "C-HE-29",
+        "pytest:tools/test_shadow_trial.py::test_kill_rule_reproducible_from_rows_and_rejected_excluded",
+        "measurement",
+        "local + CI",
+        True,
+    ),
+    Row(
+        "C-HE-29",
+        "pytest:tools/test_shadow_trial.py::test_oc_table_matches_spec_numbers",
+        "measurement",
+        "local + CI",
+        True,
+    ),
     # C-HE-01/14/21/34/35 (U-HE-39) — skill-carrier doc sweep: N ≥ 2 lane model, the
     # C-HE-14 table byte-exact, live-carrier invariant cites, non-goals, K5–K8, and the
     # §8 AC#7 no-numeric-round-cap scan. mutation-probe `—`: markdown skill prose, the

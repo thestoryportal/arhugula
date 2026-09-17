@@ -123,6 +123,20 @@ canonical §12 protocol** rather than re-stating it — the recipe lives in CLAU
   working tree pollutes + dilutes the review of the actual diff (the 2026-06-26 finding at
   `.harness/uncommitted-review-flaw-verification-arc.md`). `-uncommitted` is for genuine
   pre-commit review in a CLEAN tree only.
+- **Shadow trial, off-path (U-HE-43; C-HE-29).** After the blocking chain has reached its
+  terminal for this head, run the second reviewer's lens as a SHADOW — it never blocks and
+  never spends the arc's review budget:
+  `HARNESS_ARC_ID=<arc-id> HARNESS_LANE_ID=<lane-id> just shadow-trial-score`
+  (rows land under `producer=gemini-shadow`, one `no_finding` marker when clean; no gate
+  admission, no reservation round). Each shadow finding is disposed by the operator or a
+  third-party identity of NEITHER family under trial (never a gemini or Claude identity):
+  `just shadow-trial-adjudicate <finding_id> accepted|rejected|suppressed <actor>` — the ONLY
+  writer of `unique_catch`. Then `just shadow-trial-decide gemini-shadow --hitl`: `pending`
+  until 30 scored rounds; at 30, `kill` iff fewer than 2 unique catches (OC: `just
+  shadow-trial-decide gemini-shadow` prints nothing about it — `uv run python
+  tools/shadow_trial.py oc` does). A non-pending decision lands as a `DEFERRED-HIL` row the
+  operator answers with approve-kill | reject-keep | amend-threshold; adoption into the
+  blocking chain is never self-authorizing.
 - **Phase-span edges (U-HE-34; C-HE-27).** Durable review/edit wall-clock accretes on the
   reservation as explicit `{start, end}` pairs — N6 reads ONLY these spans, never a gap
   between two records. Each command is a single literal-id invocation (guard-allowlisted
