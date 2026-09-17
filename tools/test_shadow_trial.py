@@ -358,11 +358,18 @@ def test_an_amended_threshold_is_a_new_proposal(tmp_path: Path, monkeypatch: pyt
     monkeypatch.setattr(st, "_emit_loop_row", lambda *a: seen.append(a))
     assert st.deliver_decision(LENS, p)["decision"] == "kill" and len(seen) == 1
     assert st.deliver_decision(LENS, p)["delivered"] is False and len(seen) == 1
+    # an amended rule with the SAME outcome is still a new proposal (the rule is part of
+    # the identity, not only the outcome): threshold 2 -> 3 keeps kill and is re-delivered
+    fr.append_row(st.config_row(lens=LENS, rows=fr.read_rows(p), threshold=3), p)  # amend
+    d = st.deliver_decision(LENS, p)
+    assert d["decision"] == "kill" and d["delivered"] is True and len(seen) == 2
+    assert "threshold=3" in seen[1][3] and "KILL" in seen[1][3]
+    assert st.deliver_decision(LENS, p)["delivered"] is False and len(seen) == 2
     fr.append_row(st.config_row(lens=LENS, rows=fr.read_rows(p), threshold=1), p)  # amend
     d = st.deliver_decision(LENS, p)
-    assert d["decision"] == "keep" and d["delivered"] is True and len(seen) == 2
-    assert "threshold=1" in seen[1][3] and "KEEP" in seen[1][3]
-    assert st.deliver_decision(LENS, p)["delivered"] is False and len(seen) == 2
+    assert d["decision"] == "keep" and d["delivered"] is True and len(seen) == 3
+    assert "threshold=1" in seen[2][3] and "KEEP" in seen[2][3]
+    assert st.deliver_decision(LENS, p)["delivered"] is False and len(seen) == 3
 
 
 # mutation-probe: append the decision marker before hitl_request (mark-then-emit)
