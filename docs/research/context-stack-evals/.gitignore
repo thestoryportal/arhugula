@@ -3,6 +3,8 @@
 # beside them are the record; README.md says what each excluded set was.
 E2/*.diff
 E2/prompt_*.txt
+E2b/*.diff
+E2b/prompt_*.txt
 E6-vault/
 *.log
 E7/*.err

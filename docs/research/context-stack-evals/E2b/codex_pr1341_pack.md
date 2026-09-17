@@ -1,0 +1,6 @@
+FINDINGS: 2
+- [P2] harness-runtime/tests/test_b71_escalation_token_mint_and_fold_u_rt_155.py:550 — The defect-closing test substitutes a local dictionary for the real resume-time audit and F2 dedup path, so it never verifies that both peer entries survive production dedup.
+  scenario: If persisted-echo threading or resume-time key folding regresses, the independently composed webhook keys and this dictionary assertion still pass; the real resumed audit entries then share the wrong key and the second peer is dropped.
+- [P2] harness-cp/tests/test_b71_escalation_correlation_carriers_u_cp_102.py:137 — Every end-to-end carrier test hardcodes PARALLELIZATION, leaving the separately changed ORCHESTRATOR_WORKERS basis, echo-read, and snapshot-write path unexecuted.
+  scenario: If the worker path omits the basis or loses a carried-forward echo, this suite remains green; orchestrator or hierarchical fan-out then emits colliding first-escalation keys or rotates an unresolved gate’s key on resume.
+PACK_USED: yes

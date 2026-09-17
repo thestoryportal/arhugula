@@ -71,14 +71,14 @@
 
 
 snapshot:
-  total: 242
+  total: 244
   open: 1
   design_substrate_gated: 3
-  registered_finding: 84
+  registered_finding: 86
   operator_gated: 0
   held: 3
   closed: 151
-  identity_digest: e3bde36a2d2c7e38
+  identity_digest: 7d7abefe01ccb705
 items:
 - id: B-1
   title: Layered capability-aware routing activation
@@ -11573,3 +11573,19 @@ items:
   council: 'NO -- a measured schema gap with one mechanism; the only decision is the key shape, which the
     spec author takes at amendment.'
   heading: '### B-247 · C-HE-27 spans keep only round 1, so N6 overstates multi-round arcs and per-round wall clock is unmeasured *(surfaced by the u-he-42 wall-clock audit, 2026-09-16; REGISTERED)*'
+- id: B-248
+  title: 'PR 1330''s AST site counter matches only bare `protocol.` receivers, so the B-162 emit-at-every-capture-site witness sees 3 of 11 sites'
+  pr: '#1330 (surfaced by the E2b pack/no-pack reviewers, 2026-09-16; VERIFIED by reading the code at 2c9094c62)'
+  status: registered_finding
+  summary: 'test_the_driver_emits_at_every_capture_site (harness-runtime/tests/integration/test_b162_pause_resume_span_emission_is_wired.py:155-185) counts capture sites with `isinstance(node.func.value, ast.Name) and node.func.value.id == "protocol"`. workflow_driver.py at 2c9094c62 has 11 `capture_pause_snapshot(` call sites: 3 bare (5276, 5482, 5556) and 8 wrapped as `cast(PauseResumeProtocol, <name>).capture_pause_snapshot(` (10504, 11322, 11490, 12531, 13360, 14860, 15714, 15780), whose `func.value` is a Call node. The filter yields 3; emit_sites is 11; `len(emit_sites) >= len(capture_sites)` is 11 >= 3 and cannot fail when an `_emit_pause_captured` after a cast-wrapped site is removed, contradicting the docstring''s "asserted structurally by AST" for all six topology executors.'
+  close_out: 'REGISTERED 2026-09-16 from the E2b evaluation (docs/research/context-stack-evals/E2b-results.md), NOT absorbed: E2b is a doc-only research arc and the fix belongs to a code arc under the normal gates. Found independently by the pack and the no-pack Sonnet reviewer (the pack run cited the exact file; the no-pack run cited the neighbouring B-137 test file). WHAT CLOSES THIS ROW: make the matcher receiver-agnostic (match `node.func.attr == "capture_pause_snapshot"` regardless of `node.func.value`), assert the count equals the known site total rather than `>=`, and add a mutation witness that removing one cast-wrapped site''s `_emit_pause_captured` turns the test red.'
+  council: 'NO -- a verified test-adequacy defect with a named fix; nothing to convene over.'
+  heading: '### B-248 · B-162''s AST site counter sees 3 of 11 capture sites *(surfaced by E2b reviewers, 2026-09-16; VERIFIED; REGISTERED)*'
+- id: B-249
+  title: 'B-71 token population is wider in the implementation (every fan-out-branch escalation) than in CP v1.119''s wording (pre-dispatch gate-owning escalation), and the §0.6 resolvability stamp rides the wider population'
+  pr: '#1341 (surfaced by the E2b pack reviewer, 2026-09-16; carriers, resolver arm and stamp VERIFIED at 0af632f4e; the reviewer''s post-dispatch escalation trace not independently re-traced)'
+  status: registered_finding
+  summary: '`pre_dispatch_escalation_basis` is derived UNCONDITIONALLY at both fan-out branch-composition sites (workflow_driver.py:8560-8572, per the §0.4.1 correction note) and carried to every later step of the branch (workflow_driver_types.py:585-601, "a branch child never re-derives it"). `resolve_escalation_instance_id` arm 2 mints whenever the basis is non-None, and `_escalation_operator_surface` (hitl_gate_composer.py) stamps `resolvability: PauseLocationVariant.UNIFORM_FALLBACK_ONLY` plus `branch_context` whenever a token exists. CP v1.119 states the token''s absence as "every population that has no pre-dispatch gate-owning branch/escalation" (§25.20 value/absence rows, §0.4 arm 3, §26.9). A gate in a fan-out branch that escalates AFTER its child was dispatched -- a pause the operator can address directly by child_run_id -- would therefore carry the token and be told to use the uniform fallback. The audit-key widening itself is spec-directed (Runtime spec v1.121 site 2 names `_compose_and_persist_audit`), so the question is the population, not the fold.'
+  close_out: 'REGISTERED 2026-09-16 from the E2b evaluation (docs/research/context-stack-evals/E2b-results.md), NOT absorbed: this is a spec-versus-implementation question on a cleared CP spec (v1.119) and routes as a fork, not a patch (root CLAUDE.md §4.3). The E2b no-pack reviewer independently found the audit-key widening for non-escalating fan-out-branch gates; that part is spec-directed and its residue is a test gap (no test in #1341 exercises a non-escalating fan-out-branch gate''s key). WHAT CLOSES THIS ROW: (1) re-trace whether a post-dispatch escalation in a fan-out branch reaches `_escalate_to_secondary_channel` with the branch''s step_context (the reviewer named the dispatch loop and the durable-async branch in hitl_gate_composer.py); if it does, (2) either amend CP v1.119 to state the wider population and make the stamp conditional on the channel actually being fallback-only, or narrow the basis carry so only pre-dispatch gates mint -- an architect call, then spec-writer, then impl; (3) add the two population witnesses (non-escalating fan-out gate: byte-identical key; post-dispatch escalating fan-out gate: correct resolvability).'
+  council: 'YES if step (1) confirms the path -- population semantics of a cleared contract across CP and Runtime (C1 ⊥ C10); dyadic council before the AskUserQuestion, per CLAUDE.md §13.4.'
+  heading: '### B-249 · B-71 token population wider than the spec''s wording; resolvability stamp rides it *(surfaced by the E2b pack reviewer, 2026-09-16; carriers VERIFIED; REGISTERED)*'
