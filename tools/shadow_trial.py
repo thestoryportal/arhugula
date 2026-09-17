@@ -162,7 +162,8 @@ def decide(
 ) -> dict:
     """Reproducible from rows alone (C-HE-29 Invariants): the rule comes from the log's last
     config row (explicit `n` / `threshold` override it for evaluation), pending until n scored
-    rounds, then kill iff the sample holds fewer than `threshold` unique catches. `catches`
+    rounds AND every sampled lens finding is disposed, then kill iff the sample holds fewer
+    than `threshold` unique catches. `catches`
     lists every lens finding with `unique_catch` and its last disposition, the evidence §4
     delivers to the operator."""
     logged_n, logged_threshold = rule_from_rows(rows, lens)
@@ -195,12 +196,22 @@ def decide(
         for r in fr.reduce_last_by_finding_id(rows).values()
         if r["producer"] == lens and r["record_kind"] in ("finding", "finding_adjudication")
     ]
-    base = {"n": n, "threshold": threshold, "scored": k, "catches": catches}
-    if k < n:
-        return {**base, "unique": len(counted_ids), "decision": "pending"}
+    # C-HE-29 §4: adjudication precedes counting. A sampled finding still undisposed could
+    # yet become a unique catch, so no verdict is proposed until every sampled lens finding
+    # is disposed (codex r6 P2); the evidence names each one "adjudication pending".
+    awaiting = [c["finding_id"] for c in catches if c["in_sample"] and c["disposition"] is None]
+    base = {
+        "n": n,
+        "threshold": threshold,
+        "scored": k,
+        "catches": catches,
+        "awaiting": awaiting,
+        "unique": len(counted_ids),
+    }
+    if k < n or awaiting:
+        return {**base, "decision": "pending"}
     return {
         **base,
-        "unique": len(counted_ids),
         "decision": "kill" if len(counted_ids) < threshold else "keep",
         "sample": sample,
     }
@@ -213,6 +224,19 @@ def p_kill(p: float, n: int = N_ROUNDS, threshold: int = KILL_IF_FEWER_THAN) -> 
 
 def oc_table() -> list[tuple[float, float]]:
     return [(p, p_kill(p)) for p in (0.0, 0.05, 0.10, 0.15, 0.20, 0.25)]
+
+
+def validate_lens(lens: str) -> str:
+    """The lens under trial is a shadow producer: never a placeholder and never a blocking
+    reviewer, whose rows are the loop's own verdicts (codex r6 P2: `decide <blocking> --hitl`
+    would score ordinary review rows as a trial and enqueue a HITL over them). Parsed ONCE at
+    the CLI edge ([LAW:parse-dont-validate]); the reducers take the stamped value."""
+    if lens.strip().lower() in PLACEHOLDERS or is_blocking_producer(lens):
+        raise ValueError(
+            f"shadow-trial lens {lens!r} must be a shadow producer, never a blocking reviewer "
+            "or a placeholder"
+        )
+    return lens
 
 
 def validate_adjudicator(actor: str) -> None:
@@ -498,17 +522,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     rq.add_argument("--lens", required=True)
     a = p.parse_args(argv)
-    if a.cmd == "request-adjudications":
-        for f in request_adjudications(a.lens):
-            print(f["finding_id"])
-        return 0
-    if a.cmd == "adjudicate":
-        row = adjudicate(a.finding_id, disposition=a.disposition, actor=a.actor, lens=a.lens)
-        print(json.dumps(row))
-        return 0
     if a.cmd == "oc":
         for pv, pk in oc_table():
             print(f"p={pv:.2f}  P(kill)={pk:.3f}")
+        return 0
+    lens = validate_lens(a.lens)  # before any read or write: a refused lens touches nothing
+    if a.cmd == "request-adjudications":
+        for f in request_adjudications(lens):
+            print(f["finding_id"])
+        return 0
+    if a.cmd == "adjudicate":
+        row = adjudicate(a.finding_id, disposition=a.disposition, actor=a.actor, lens=lens)
+        print(json.dumps(row))
         return 0
     if a.cmd == "config":
 
@@ -516,16 +541,16 @@ def main(argv: list[str] | None = None) -> int:
             if a.if_absent and any(
                 r["producer"] == CONFIG_PRODUCER
                 and r["finding_type"] == CONFIG_TYPE
-                and r["location"] == a.lens
+                and r["location"] == lens
                 for r in rows
             ):
                 return None
-            return config_row(lens=a.lens, rows=rows, n=a.n, threshold=a.threshold)
+            return config_row(lens=lens, rows=rows, n=a.n, threshold=a.threshold)
 
         written = fr.append_derived(build)
         print("config row appended" if written else "config row already present")
         return 0
-    d = deliver_decision(a.lens) if a.hitl else decide(fr.read_rows(), a.lens)
+    d = deliver_decision(lens) if a.hitl else decide(fr.read_rows(), lens)
     print(json.dumps(d))
     return 0
 

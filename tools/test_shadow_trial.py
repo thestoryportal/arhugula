@@ -120,6 +120,51 @@ def test_kill_rule_reproducible_from_rows_and_rejected_excluded():
     assert st.decide(rows, LENS)["decision"] == "keep"
 
 
+# mutation-probe: drop the `awaiting` arm of the pending rule (verdict at n rounds regardless)
+def test_no_verdict_while_a_sampled_finding_is_undisposed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """C-HE-29 §4: adjudication precedes counting. With n rounds scored but a sampled lens
+    finding still undisposed the decision is pending and nothing is delivered; once it is
+    disposed the verdict follows (codex r6 P2)."""
+    p = tmp_path / "g.jsonl"
+    for r in _markers(30):
+        fr.append_row(r, p)
+    x = _row(7, LENS, location="x", uc=None)
+    fr.append_row(x, p)
+    seen: list[tuple] = []
+    monkeypatch.setattr(st, "_emit_loop_row", lambda *a: seen.append(a))
+    d = st.decide(fr.read_rows(p), LENS)
+    assert d["scored"] == 30 and d["decision"] == "pending"
+    assert d["awaiting"] == [x["finding_id"]]
+    st.hitl_request(d, LENS)  # the evidence names the open adjudication
+    assert "PENDING" in seen[-1][3] and "undisposed (adjudication pending)" in seen[-1][3]
+    seen.clear()
+    assert st.deliver_decision(LENS, p)["delivered"] is False and seen == []
+    fr.append_row(_adj(7, "x", "accepted", ts="2026-08-18T00:00:08Z"), p)
+    d = st.deliver_decision(LENS, p)
+    assert d["decision"] == "kill" and d["awaiting"] == [] and d["delivered"] is True
+    assert len(seen) == 1
+
+
+# mutation-probe: drop the is_blocking_producer arm of validate_lens
+def test_a_blocking_reviewer_is_never_a_lens(monkeypatch: pytest.MonkeyPatch):
+    """codex r6 P2: `decide codex_review_wrapper --hitl` would score the loop's own verdict
+    rows as a trial and enqueue a HITL over them. The lens is parsed at the CLI edge, before
+    any read or write."""
+    assert st.validate_lens(LENS) == LENS
+    monkeypatch.setattr(st.fr, "read_rows", lambda *a, **k: pytest.fail("read before parse"))
+    monkeypatch.setattr(st.fr, "append_derived", lambda *a, **k: pytest.fail("write"))
+    for lens in ("codex_review_wrapper", "merge-gate-concurrency", "", "TBD"):
+        for argv in (
+            ["decide", "--lens", lens, "--hitl"],
+            ["config", "--lens", lens],
+            ["request-adjudications", "--lens", lens],
+        ):
+            with pytest.raises(ValueError, match="never a blocking reviewer"):
+                st.main(argv)
+
+
 # mutation-probe: treat every non-lens producer as blocking (drop is_blocking_producer)
 def test_operational_producers_never_disqualify_a_catch():
     """A merge-door or concurrency-probe row is not a review; only loop producers and
@@ -293,7 +338,19 @@ def test_hitl_request_presents_the_sample_and_every_disposition(monkeypatch: pyt
     rows.append(_row(20, "codex_review_wrapper", location="c"))  # blocked
     rows.append(_row(31, LENS, location="d", uc=True))
     rows.append(_adj(31, "d", "accepted"))  # accepted but outside the frozen sample
-    rows.append(_row(8, LENS, location="e", uc=None))  # undisposed: still presented
+    rows.append(_row(8, LENS, location="e", uc=None))
+    rows.append(  # disposed, never a catch: presented
+        _row(
+            8,
+            LENS,
+            kind="finding_adjudication",
+            location="e",
+            disp="suppressed",
+            actor="operator",
+            uc=None,
+            ts="2026-08-18T00:00:09Z",
+        )
+    )
     rows.append(_row(9, LENS, location="f", uc=None))
     rows.append(
         _row(
@@ -318,6 +375,7 @@ def test_hitl_request_presents_the_sample_and_every_disposition(monkeypatch: pyt
     assert "/r5=accepted [COUNTED]" in detail
     assert "/r12=rejected [not counted: last disposition rejected]" in detail
     assert "/r20=accepted [not counted: a blocking reviewer reported the same key]" in detail
+    assert "/r8=suppressed [not counted: adjudicated unique_catch=false]" in detail
     assert "/r31=accepted [not counted: outside the frozen sample]" in detail
     assert "/r8=undisposed [not counted: undisposed (adjudication pending)]" in detail
     assert "/r9=accepted [not counted: adjudicated unique_catch=false]" in detail

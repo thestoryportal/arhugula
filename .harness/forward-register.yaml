@@ -71,14 +71,14 @@
 
 
 snapshot:
-  total: 245
+  total: 246
   open: 1
   design_substrate_gated: 3
-  registered_finding: 87
+  registered_finding: 88
   operator_gated: 0
   held: 3
   closed: 151
-  identity_digest: 8a687b88662863c4
+  identity_digest: 76bea303476f6254
 items:
 - id: B-1
   title: Layered capability-aware routing activation
@@ -11597,3 +11597,11 @@ items:
   close_out: 'REGISTERED 2026-09-16 on u-he-43 (codex round 3 P2, adjudicated rejected-as-registered: the cleared plan is the execution authority for the key; the spec sentence owes a wording change-note). WHAT CLOSES THIS ROW: a Spec_HE_Loop_Lanes change-note (dated, in-place tag at C-HE-29 §2 + note at the top + successor clearance marker + `just artifact-heads-write`, the pattern X1/X2 used) restating the denominator as COUNT(DISTINCT (arc_id, round_n) WHERE producer=<lens>) and naming C-HE-25''s per-arc round scale as the reason; no code change — tools/test_shadow_trial.py::test_scored_rounds_are_per_arc is the witness the note cites.'
   council: 'NO -- a wording defect with one consistent reading across C-HE-25/C-HE-29 and the plan; nothing to convene over.'
   heading: '### B-250 · C-HE-29 §2 denominator wording vs the per-arc round key *(surfaced on u-he-43 codex r3, 2026-09-16; REGISTERED)*'
+- id: B-251
+  title: 'C-HE-29 §2 scores every distinct (arc_id, round_n) of the shadow lens, but a repeated `just shadow-trial-score` on one arc head mints a fresh shadow round each time; the spec does not say whether re-runs on one head are one scored round or several'
+  pr: '#u-he-43 (surfaced by codex u-he-43 round 6; the landed reducer follows the spec key)'
+  status: registered_finding
+  summary: 'tools/agy_review.py in shadow mode mints a producer-local round under the log lock on every invocation (C-HE-24 §2 round minting), so two shadow runs on the same (arc_id, head_sha) are two scored rounds and could reach n=30 with duplicate reviews of one change. C-HE-29 §2 defines the denominator over DISTINCT rounds and says nothing about re-runs on one head; the ship-pr carriers run the shadow once per head after the blocking terminal, so the duplicate is operator-driven, not the unattended path. Neither dedupe key (collapse rounds sharing head_sha in the reducer; refuse a second shadow run per head in the wrapper) is in the cleared spec or plan, and each changes what a scored round IS.'
+  close_out: 'REGISTERED 2026-09-17 on u-he-43 (codex round 6 P2, adjudicated rejected-as-registered: the reducer follows the spec key; the dedupe rule is a spec decision). WHAT CLOSES THIS ROW: a Spec_HE_Loop_Lanes change-note at C-HE-29 §2 stating the scored-round identity under re-runs (recommended: DISTINCT (arc_id, head_sha) for the shadow lens, the first row in append order wins, so a re-run on one head never adds a round) + successor clearance marker + `just artifact-heads-write`, then the reducer edit in tools/shadow_trial.py::scored_rounds / first_n_rounds with a witness that two shadow rows on one (arc_id, head_sha) count once.'
+  council: 'NO -- one design fork with two nameable options inside one contract (C-HE-29 §2); the spec-writer applies whichever the operator picks, nothing cross-domain to convene over.'
+  heading: '### B-251 · C-HE-29 §2 scored-round identity under repeated shadow runs on one head *(surfaced on u-he-43 codex r6, 2026-09-17; REGISTERED)*'
