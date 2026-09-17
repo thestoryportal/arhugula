@@ -8,9 +8,9 @@
 
 | Field | Value |
 |---|---|
-| `workspace_state_hash` | `b820ecae712b` |
+| `workspace_state_hash` | `825334770acf` |
 | `last_refreshed` | 2026-09-17T00:00:00Z |
-| `git_head` | `c2767d3d` —  |
+| `git_head` | `f926a9df` —  |
 | `latest_retirement_batch` | `.harness/phase-7d-retirement-events-batch-57.md` |
 | `open_fork_doc_count` | 121 |
 
@@ -22,7 +22,7 @@
 
 **Purpose.** Live pointer to the next Claude/Codex-executable frontier. Full round-by-round history (every prior round, verbatim, most-recent-first) lives in the archive below — grep it by PR/`B-`/`R-`-id/round, never read wholesale.
 
-**Current next action (post-#1544).** PR #1544 closed handoff-s2 §2 C: E4 re-run with 20 operator-shaped questions whose ground truth is the session and the exact turn (verified by verbatim quote through e4_turn.py), scored against a threshold written before the run — session hit@1 9/20, hit@5 12/20, turn hit@1 7/20, hit@5 8/20 — verdict AUGMENT: memory stays the authority, the session-history index answers "where did that come from" and, when it lands the session at rank 1, lands the turn in 7 of 9. Owed next, in the order of docs/research/context-stack-handoff-2026-09-16-s2.md §2: (D) E2 on two merged PRs touching harness-*/src with non-empty `graft blast` depth 2, the four-reviewer design, then one `just codex-review` trial with the pack; (E) the E3 reconfiguration — drift defined as a claimed-identical passage that is not, version-token deltas and relocation headers excluded, scored against a normalised diff; the instance-only intake cap/trigger question (handoff-s2 §4) stays deferred by operator decision until a rate baseline exists; then U-HE-43.
+**Current next action (post-#1546).** PR #1546 closed handoff-s2 §2 D: E2 re-run on two merged PRs with a non-empty graft blast at depth 2 (#1341, #1330), four fresh Sonnet reviewers bound to a worktree at the reviewed commit plus one codex run with the pack — six findings, four verified in full, two with a qualification, none refuted; verdict "supported for precision, not recall, at n=2" (attach the ~3 KB blast markdown to the out-of-family prompt and judge it by citation accuracy). Two verified findings against merged code are registered: B-248 (B-162's AST site counter sees 3 of 11 capture sites; test-adequacy, named fix) and B-249 (the B-71 token population is wider in the implementation than in CP v1.119's wording and the §0.6 resolvability stamp rides it; a fork, council if the post-dispatch path is confirmed). Owed next, in the order of docs/research/context-stack-handoff-2026-09-16-s2.md §2: (E) the E3 reconfiguration — drift defined as a claimed-identical passage that is not, version-token deltas and relocation headers excluded, scored only on claimed-identical pairs and compared against a normalised diff; the instance-only intake cap/trigger question (handoff-s2 §4) stays deferred by operator decision until a rate baseline exists; then U-HE-43, with B-248 and B-249 as the two freshest register rows after it.
 
 **Archive.** `.harness/roadmap-next-action-archive.md` (PRIOR rounds only, verbatim as each stood when superseded — the current round lives only in this head; the newest superseded round may lag there until the next content PR archives it, and is always losslessly recoverable from this file's own git history meanwhile).
 
@@ -50,11 +50,11 @@
 
 | R-NNN / PR | Closed at | Notes |
 |---|---|---|
+| PR #1546 | 2026-09-17 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1544 | 2026-09-17 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1542 | 2026-09-17 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1540 | 2026-09-16 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1538 | 2026-09-16 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
-| PR #1536 | 2026-09-16 | B-245 (C-HE-28 §4 outcome-measure cohorts unowned) and B-246 (C-HE-33 §3 parity false in CI's two-parent checkout, measured) registered on PR #1536 (merge 902cd3b3) as one doc-only PR under the lean protocol: codex one round, APPROVE, 0 findings. Both were U-HE-42 residuals drafted mid-arc; close-outs rewritten post-convergence. Register: 242 items / 84 registered_finding. The U-HE-42 close is now fully recorded: #1527 code, #1530 fork + plan amendment, #1534 plan ticks, #1532 B-247, #1536 B-245/B-246. |
 
 ---
 
