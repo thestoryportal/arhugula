@@ -8,9 +8,9 @@
 
 | Field | Value |
 |---|---|
-| `workspace_state_hash` | `c05192bc2844` |
+| `workspace_state_hash` | `b820ecae712b` |
 | `last_refreshed` | 2026-09-17T00:00:00Z |
-| `git_head` | `632634f4` —  |
+| `git_head` | `c2767d3d` —  |
 | `latest_retirement_batch` | `.harness/phase-7d-retirement-events-batch-57.md` |
 | `open_fork_doc_count` | 121 |
 
@@ -22,7 +22,7 @@
 
 **Purpose.** Live pointer to the next Claude/Codex-executable frontier. Full round-by-round history (every prior round, verbatim, most-recent-first) lives in the archive below — grep it by PR/`B-`/`R-`-id/round, never read wholesale.
 
-**Current next action (post-#1542).** PR #1542 closed handoff-s2 §2 B by falsifying its premise: at the 2026-09-16 corpus 30 of the 35 "drift" findings are contract, configuration, roadmap or arc-metrics-cohort drift, not prose decay, so `drift` was evaluated and left out of the preflight's class 2 (recorded in the precision-bound comment above CLASSES in refresh-classes.py, pinned by a negative witness), while the witness lens's P3 landed: `test_report_counts_agree_with_classify` now checks the report's tallies against the `classify` verb on the same rows; the recurring "test codifies the drift" shape (7+ rows) is a new-class candidate for a later intake. Owed next, in the order of docs/research/context-stack-handoff-2026-09-16-s2.md §2: (C) E4 with real questions, (D) E2 on PRs with callers under harness-*/src, (E) the E3 reconfiguration with boilerplate exclusion and a target definition; the instance-only intake cap/trigger question (handoff-s2 §4) stays deferred by operator decision until a rate baseline exists; then U-HE-43.
+**Current next action (post-#1544).** PR #1544 closed handoff-s2 §2 C: E4 re-run with 20 operator-shaped questions whose ground truth is the session and the exact turn (verified by verbatim quote through e4_turn.py), scored against a threshold written before the run — session hit@1 9/20, hit@5 12/20, turn hit@1 7/20, hit@5 8/20 — verdict AUGMENT: memory stays the authority, the session-history index answers "where did that come from" and, when it lands the session at rank 1, lands the turn in 7 of 9. Owed next, in the order of docs/research/context-stack-handoff-2026-09-16-s2.md §2: (D) E2 on two merged PRs touching harness-*/src with non-empty `graft blast` depth 2, the four-reviewer design, then one `just codex-review` trial with the pack; (E) the E3 reconfiguration — drift defined as a claimed-identical passage that is not, version-token deltas and relocation headers excluded, scored against a normalised diff; the instance-only intake cap/trigger question (handoff-s2 §4) stays deferred by operator decision until a rate baseline exists; then U-HE-43.
 
 **Archive.** `.harness/roadmap-next-action-archive.md` (PRIOR rounds only, verbatim as each stood when superseded — the current round lives only in this head; the newest superseded round may lag there until the next content PR archives it, and is always losslessly recoverable from this file's own git history meanwhile).
 
@@ -50,11 +50,11 @@
 
 | R-NNN / PR | Closed at | Notes |
 |---|---|---|
+| PR #1544 | 2026-09-17 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1542 | 2026-09-17 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1540 | 2026-09-16 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1538 | 2026-09-16 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1536 | 2026-09-16 | B-245 (C-HE-28 §4 outcome-measure cohorts unowned) and B-246 (C-HE-33 §3 parity false in CI's two-parent checkout, measured) registered on PR #1536 (merge 902cd3b3) as one doc-only PR under the lean protocol: codex one round, APPROVE, 0 findings. Both were U-HE-42 residuals drafted mid-arc; close-outs rewritten post-convergence. Register: 242 items / 84 registered_finding. The U-HE-42 close is now fully recorded: #1527 code, #1530 fork + plan amendment, #1534 plan ticks, #1532 B-247, #1536 B-245/B-246. |
-| PR #1534 | 2026-09-16 | Plan records for U-HE-38 (#1523), U-HE-39 (#1525) and U-HE-42 (#1527) landed on PR #1534 (merge a940ce2d): Steps 1-4 ticked with dated as-built status paragraphs in the #1519 shape, plus the as-built clearance marker and heads regen. Codex r1 BLOCK 3 P2 (marker added; B-245/B-246 restated as drafted, not registered; Step-1 reopening rejected on the #1519 tick semantics), r2 APPROVE. |
 
 ---
 
