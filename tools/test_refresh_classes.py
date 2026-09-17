@@ -46,6 +46,33 @@ def test_classify_names_every_matching_class_and_empty_for_unmatched():
     assert out["a:2"] == []
 
 
+def test_bare_drift_is_not_class_2_vocabulary():
+    # handoff-s2 §2 B proposed `\bdrift` for class 2; the corpus said no (30 of 35 "drift"
+    # rows are contract / configuration / roadmap drift or the arc-metrics drift cohort —
+    # see the LEFT OUT note above CLASSES). These shapes must stay in the intake pile.
+    rows = [
+        {
+            "finding_id": "d:1",
+            "observed_evidence": "the added test codifies this contract drift",
+            "location": "",
+        },
+        {
+            "finding_id": "d:2",
+            "observed_evidence": "allowing configuration drift to go undetected",
+            "location": "",
+        },
+        {
+            "finding_id": "d:3",
+            "observed_evidence": "reports a confident zero regardless of actual roadmap drift",
+            "location": "",
+        },
+        {"finding_id": "d:4", "observed_evidence": "the lease is left adrift", "location": ""},
+    ]
+    out = json.loads(_run("classify", stdin=json.dumps(rows)).stdout)
+    for fid in ("d:1", "d:2", "d:3", "d:4"):
+        assert "2 prose stale / counts / cites" not in out[fid], fid
+
+
 def test_classify_reads_the_location_too():
     # the location carries file-shaped vocabulary the row text may lack
     rows = [{"finding_id": "b:1", "observed_evidence": "", "location": "tools/conftest.py fixture"}]
@@ -88,6 +115,27 @@ def test_report_counts_agree_with_classify(tmp_path: Path):
     assert "2 findings in" in proc.stdout
     assert "    1  3 silent failure / fallback" in proc.stdout
     assert "Unmatched findings (new-class candidates): 1" in proc.stdout
+    # the same rows through the verb: its per-class tally and its unmatched count must be
+    # the numbers the report printed — one function, two consumers (handoff-s2 §2 B, P3)
+    finding_rows = [
+        {"finding_id": f"r:{i}", "observed_evidence": r["observed_evidence"], "location": ""}
+        for i, r in enumerate(rows)
+        if r["record_kind"] == "finding"
+    ]
+    verb = subprocess.run(
+        [sys.executable, str(copy), "classify"],
+        input=json.dumps(finding_rows),
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
+    )
+    assert verb.returncode == 0, verb.stderr
+    by_id = json.loads(verb.stdout)
+    assert len(by_id) == 2
+    unmatched = sum(1 for hits in by_id.values() if not hits)
+    silent = sum(1 for hits in by_id.values() if "3 silent failure / fallback" in hits)
+    assert f"Unmatched findings (new-class candidates): {unmatched}" in proc.stdout
+    assert f"    {silent}  3 silent failure / fallback" in proc.stdout
     assert "the widget frobnicates" in proc.stdout
 
 

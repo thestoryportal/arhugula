@@ -49,6 +49,16 @@ from pathlib import Path
 # that class's vocabulary. This tool is advisory by its own docstring and multi-match is
 # by design; successive regex layers were measured trading one imprecision for another
 # without converging, so the bound is documented here rather than chased further.
+#
+# Vocabulary evaluated and LEFT OUT (so it is not re-proposed): `drift` for class 2
+# (handoff-s2 §2 B, 2026-09-16). At that day's corpus of 2,103 findings, 35 rows said
+# "drift" and 30 of them matched no class-2 term — but read, they are contract drift
+# (a witness that codifies a spec departure), configuration drift, roadmap drift and the
+# arc-metrics `drift` cohort/fixture; prose decay in the class-2 sense was at most 2
+# rows under any prose-adjacent form tried. A bare `\bdrift` would have moved the 30
+# out of the new-class intake pile, the wrong direction under the policy above (codex
+# r1 P2 on the class-2-drift-extension arc). The recurring "test codifies the drift"
+# shape (7+ rows) is a new-class candidate, not a class-2 term.
 CLASSES: dict[str, str | tuple[str, ...]] = {
     "1 race / TOCTOU / atomicity / lock": (
         r"race|TOCTOU|atomic|lock|flock|concurrent|interleav|CAS|exclusive"
