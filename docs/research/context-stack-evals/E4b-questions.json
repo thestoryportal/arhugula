@@ -1,0 +1,162 @@
+[
+  {
+    "id": "Q01",
+    "memory": "anchored-slice-witness-needs-boundedness-marker.md",
+    "session": "8a9669c4-98d6-41fb-8d15-5f27fe9c5334",
+    "turn": 107,
+    "quote": "the `section()` extractor fails loud on a missing START anchor but silently widens to EOF on a missing END anchor, defeating the section-scoping claim in the compound relocation+anchor-drift case.",
+    "question": "What did the witness-adequacy lens flag about how the section() extractor handles a missing END anchor?"
+  },
+  {
+    "id": "Q02",
+    "memory": "arc-landing-wall-clock-audit-u-he-42.md",
+    "session": "cb572fd8-142c-4b52-94a7-2f185b1c1a50",
+    "turn": 136,
+    "quote": "Total arc wall clock was about 547 minutes for one unit.",
+    "question": "How long did the U-HE-42 arc actually take from reservation to merge?"
+  },
+  {
+    "id": "Q03",
+    "memory": "ci-gate-classifier-self-guard-and-step-execution-witness.md",
+    "session": "a07bac51-337b-42b6-a460-0bfecedb2f9a",
+    "turn": 42,
+    "quote": "my self-guard test only greps the bash source, so inverting `-n` to `-z` would pass it. The fix is a behavioral test that executes the step's actual `run:` script under bash in a temp git repo",
+    "question": "What was wrong with the original self-guard test for the CI gate-classifier step, per the witness lens?"
+  },
+  {
+    "id": "Q04",
+    "memory": "def-time-path-default-leaks-into-tracked-logs.md",
+    "session": "846120fe-6e36-4a95-a292-b002a9b96d95",
+    "turn": 14,
+    "quote": "Confirmed leakage — the def-time default bound the real md path. Reverting the two leaked lines (the only change to that tracked file) and fixing the module to resolve paths at call time.",
+    "question": "What caused a test run to accidentally write into the real tracked log file, and how was it fixed?"
+  },
+  {
+    "id": "Q05",
+    "memory": "ephemeral-worktree-for-git-automation.md",
+    "session": "28e94c36-c2a2-4168-b41f-20c7cf98ecda",
+    "turn": 139,
+    "quote": "the emit producer's `git checkout -B` mutates the *invoking worktree's* HEAD with no cwd pin and no restoration; plus a cross-worktree recovery collision",
+    "question": "What concurrency defect did the merge-gate lens find that 20 rounds of codex review had missed?"
+  },
+  {
+    "id": "Q06",
+    "memory": "feedback-subagent-prompts-are-laws-prompt-medium.md",
+    "session": "3b2ca15f-92e6-4334-be9c-5e4a113d7c81",
+    "turn": 82,
+    "quote": "I think you misunderstand what laws:prompts is designed to do. It is a skill for writing prompts that any other LLM will consume - tasks, subagents, agent guidance, etc/",
+    "question": "When did the operator correct my read on what the laws:prompt skill is actually for?"
+  },
+  {
+    "id": "Q07",
+    "memory": "gate-and-lens-runs-bind-the-head.md",
+    "session": "49196571-aafe-4d6b-bd8e-58ead171fe4a",
+    "turn": 115,
+    "quote": "The lesson for the rest of this arc: launch the superset gate once, only after codex has approved a head, not speculatively on each fix.",
+    "question": "What's the rule for timing a superset-gate launch relative to codex's approval of a head?"
+  },
+  {
+    "id": "Q08",
+    "memory": "mechanism-precedent-search-before-authoring.md",
+    "session": "b6bed0d9-79b6-4d82-8c35-bc94342f1706",
+    "turn": 112,
+    "quote": "the reviewed **sibling code embodied ~90 prior absorbed findings** — at least 7 of this arc's findings re-derived, round by paid round, disciplines `run_bounded`/`agy_review` already contained",
+    "question": "How many of this arc's paid review rounds just re-derived disciplines already sitting in sibling code?"
+  },
+  {
+    "id": "Q09",
+    "memory": "merge-gate-overturns-register-and-hold-fail-closed-guard.md",
+    "session": "3bc72c98-0e07-43e9-bb81-bdc4d98c0720",
+    "turn": 64,
+    "quote": "on first wrapper use, `land()` merges, the refresh subprocess fails on the nonexistent flag, `mark_blocked()` wedges the single global lease, and every lane is refused until operator unblock.",
+    "question": "What deterministic failure trace did the concurrency lens sharpen the held refresh-flag class into?"
+  },
+  {
+    "id": "Q10",
+    "memory": "merged-pr-body-edit-triggers-red-ci.md",
+    "session": "69f912b3-3f2b-46c6-8f4c-ab6e7531e5cf",
+    "turn": 180,
+    "quote": "It's the already-merged #1469 branch re-running CI because my post-merge body correction fired the workflow's `pull_request: edited` trigger; the stale branch head then correctly hard-fails the roadmap-drift guard against moved-on main.",
+    "question": "Why did a red CI run show up on a PR that was already merged, right after I fixed its body text?"
+  },
+  {
+    "id": "Q11",
+    "memory": "plan-rev-bundle-owes-marker-heads-and-wiring-suite.md",
+    "session": "3bc72c98-0e07-43e9-bb81-bdc4d98c0720",
+    "turn": 86,
+    "quote": "Creating the U-HE-25 as-built clearance marker (the DESIGN_IMPL_MIX ratification, per the U-HE-18/19/20/21/23 convention; filename + version-text both win the head sorts).",
+    "question": "What clearance-marker convention applies when a plan revision note is bundled together with its implementation?"
+  },
+  {
+    "id": "Q12",
+    "memory": "scoped-claim-presented-as-unscoped.md",
+    "session": "832d7205-6da2-4ce6-87fc-f9d9eaf8f89e",
+    "turn": 260,
+    "quote": "I adjudicated all 34 codex findings, wrote \"0 undisposed\" in the PR body — and left the 10 findings from my own merge-gate rounds at `disposition=null`.",
+    "question": "What self-authored defect did the spec-conformance lens catch in my own PR body's disposition claim?"
+  },
+  {
+    "id": "Q13",
+    "memory": "arc-close-traps-u-he-42.md",
+    "session": "cb572fd8-142c-4b52-94a7-2f185b1c1a50",
+    "turn": 122,
+    "quote": "Main's red guard run is the two-merges-without-a-refresh case and is cured by refresh PR #1531, whose corrected head `53986d8ce` is under CI with a watcher.",
+    "question": "Why did main go red right after landing two merges back to back without a refresh in between?"
+  },
+  {
+    "id": "Q14",
+    "memory": "ansi-codes-defeat-anchored-grep-on-gate-output.md",
+    "session": "9a665850-3581-4a5e-b782-124607a41f8e",
+    "turn": 140,
+    "quote": "The round-5 gate showed `1 failed` and my anchored grep reported `0` — the color codes hid it. Had I trusted that grep I'd have merged on a false green.",
+    "question": "How did colored terminal output almost cause a false-green merge decision on the gate?"
+  },
+  {
+    "id": "Q15",
+    "memory": "context-stack-program-state-2026-09-16.md",
+    "session": "597d73f4-903d-4bdd-8f37-6acd0e75bf1f",
+    "turn": 135,
+    "quote": "Keep Graft, now restored on this machine, because it is integrated, refreshes in 11 s, and is the one tool that beat grep on a real shape. Keep the Pixeltable index as an on-demand search for paraphrased prose questions, never as a first-call tool and never for code. Do not adopt Graphify for agent retrieval here.",
+    "question": "What did the four-regime retrieval test conclude about keeping Graft versus adopting Graphify?"
+  },
+  {
+    "id": "Q16",
+    "memory": "u-sr-scoping-inputs-finding-index-held.md",
+    "session": "69f912b3-3f2b-46c6-8f4c-ab6e7531e5cf",
+    "turn": 173,
+    "quote": "Ground truth from the gate log: **35 codex findings, 30 accepted, 5 rejected.**",
+    "question": "What was the final accepted-versus-rejected tally of findings behind the u-he-48 churn retrospective?"
+  },
+  {
+    "id": "Q17",
+    "memory": "plan-doc-with-code-draws-nonconvergent-review.md",
+    "session": "b0a8773f-8903-4582-a75a-9e4f6bfebd7c",
+    "turn": 85,
+    "quote": "The other four-fifths were code-level defects in draft snippets that each task's arc rewrites anyway, plus prose consistency. That is why I rescoped the plan to interfaces, tests and constraints at round 5.",
+    "question": "Why did the loop-optimization plan get rescoped away from full code snippets partway through review?"
+  },
+  {
+    "id": "Q18",
+    "memory": "transcript-cost-audit-dedupe-by-requestid.md",
+    "session": "5a9ee349-4847-4f8c-9f45-8460d26297c6",
+    "turn": 4,
+    "quote": "Tokens (deduped by `requestId` — the brief's figures were 1.9× inflated):** main session 418 calls, 355k output, 169.4M cache-read, 1.8M cache-write → ≈21.0M input-equivalent",
+    "question": "By how much was the earlier session token-cost estimate inflated before deduping by requestId?"
+  },
+  {
+    "id": "Q19",
+    "memory": "fix-reopens-defect-from-opposite-side.md",
+    "session": "9a665850-3581-4a5e-b782-124607a41f8e",
+    "turn": 121,
+    "quote": "it credited any call argument, so a lint-clean DRY hoist of a declaration literal made a schema declaration read as a producer.",
+    "question": "How did the round-3 fix for a false negative end up reopening the same hole from the opposite side?"
+  },
+  {
+    "id": "Q20",
+    "memory": "feedback-agent-tool-no-hil-approval.md",
+    "session": "a791b024-4965-4b81-be6a-00bb02540cba",
+    "turn": 209,
+    "quote": "Change the instructions for using the agent tool to not require HIL approval. And then proceed with the merge gate.",
+    "question": "When did the operator say the Agent tool no longer needs a human-in-the-loop approval step?"
+  }
+]
