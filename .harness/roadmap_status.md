@@ -8,9 +8,9 @@
 
 | Field | Value |
 |---|---|
-| `workspace_state_hash` | `825334770acf` |
+| `workspace_state_hash` | `3a96caa26cdc` |
 | `last_refreshed` | 2026-09-17T00:00:00Z |
-| `git_head` | `f926a9df` —  |
+| `git_head` | `26df6639` —  |
 | `latest_retirement_batch` | `.harness/phase-7d-retirement-events-batch-57.md` |
 | `open_fork_doc_count` | 121 |
 
@@ -22,7 +22,7 @@
 
 **Purpose.** Live pointer to the next Claude/Codex-executable frontier. Full round-by-round history (every prior round, verbatim, most-recent-first) lives in the archive below — grep it by PR/`B-`/`R-`-id/round, never read wholesale.
 
-**Current next action (post-#1546).** PR #1546 closed handoff-s2 §2 D: E2 re-run on two merged PRs with a non-empty graft blast at depth 2 (#1341, #1330), four fresh Sonnet reviewers bound to a worktree at the reviewed commit plus one codex run with the pack — six findings, four verified in full, two with a qualification, none refuted; verdict "supported for precision, not recall, at n=2" (attach the ~3 KB blast markdown to the out-of-family prompt and judge it by citation accuracy). Two verified findings against merged code are registered: B-248 (B-162's AST site counter sees 3 of 11 capture sites; test-adequacy, named fix) and B-249 (the B-71 token population is wider in the implementation than in CP v1.119's wording and the §0.6 resolvability stamp rides it; a fork, council if the post-dispatch path is confirmed). Owed next, in the order of docs/research/context-stack-handoff-2026-09-16-s2.md §2: (E) the E3 reconfiguration — drift defined as a claimed-identical passage that is not, version-token deltas and relocation headers excluded, scored only on claimed-identical pairs and compared against a normalised diff; the instance-only intake cap/trigger question (handoff-s2 §4) stays deferred by operator decision until a rate baseline exists; then U-HE-43, with B-248 and B-249 as the two freshest register rows after it.
+**Current next action (post-#1548).** PR #1548 closed handoff-s2 §2 E, the last research item of the context-stack program: E3 reconfigured to score drift only where the text claims identity — 33 relocated sections claimed, 32 byte-identical at the relocation commit and one claimed but absent (docs/governance/project-framing.md line 3 claims §7, which lives in skills-and-subphases.md: a one-line header fix owed as workspace-ops), 0 lineage lines lost by the artifact-pointers split, 0 true preserved-yet-re-tabled sections in the Workflow delta chain (1 flagged, read as a mention), and the 30 root pointer stubs all above the read thresholds with cosine and lexical containment disagreeing on rank (rho 0.46) — verdict: embeddings add nothing over a normalised diff for identity claims. The program record now stands at docs/research/context-stack-evals/README.md rows E1–E8 with E2b/E3b/E4b beside their originals; B-248 and B-249 are the two shipped-code findings it registered. The instance-only intake cap/trigger question (handoff-s2 §4) stays deferred by operator decision until a rate baseline exists; then U-HE-43.
 
 **Archive.** `.harness/roadmap-next-action-archive.md` (PRIOR rounds only, verbatim as each stood when superseded — the current round lives only in this head; the newest superseded round may lag there until the next content PR archives it, and is always losslessly recoverable from this file's own git history meanwhile).
 
@@ -50,11 +50,11 @@
 
 | R-NNN / PR | Closed at | Notes |
 |---|---|---|
+| PR #1548 | 2026-09-17 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1546 | 2026-09-17 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1544 | 2026-09-17 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1542 | 2026-09-17 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 | PR #1540 | 2026-09-16 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
-| PR #1538 | 2026-09-16 | landed through the merge door; terminating refresh as continuation (C-HE-06 §4(viii)) |
 
 ---
 
