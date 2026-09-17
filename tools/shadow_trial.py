@@ -57,7 +57,12 @@ def config_row(
     *, lens: str, rows: list[dict], n: int = N_ROUNDS, threshold: int = KILL_IF_FEWER_THAN
 ) -> dict:
     """The rule as a row, its id minted against `rows` so every amendment is a NEW observation
-    (an immutable core cannot be rewritten under one id — C-HE-24 §5)."""
+    (an immutable core cannot be rewritten under one id — C-HE-24 §5). The bound is the rule's
+    own: a kill needs `threshold` catches to be reachable, so 1 <= threshold <= n (§3)."""
+    if not 1 <= threshold <= n:  # [LAW:parse-dont-validate] the row is the stamped rule
+        raise ValueError(
+            f"shadow-trial rule needs 1 <= kill_if_fewer_than <= n, got {threshold}/{n}"
+        )
     fid = fr.next_finding_id(CONFIG_PRODUCER, CONFIG_TYPE, lens, rows)
     core = fr.FindingCore(
         fid,

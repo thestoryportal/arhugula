@@ -175,6 +175,14 @@ def test_rule_read_from_the_last_config_row_and_amendable():
     assert st.decide(rows, LENS, threshold=2)["decision"] == "kill"  # explicit override
 
 
+def test_config_row_bounds_the_rule():
+    """1 <= threshold <= n: a threshold of 0 can never kill and one above n can never keep."""
+    for n, threshold in ((30, 0), (30, 31), (0, 1)):
+        with pytest.raises(ValueError):
+            st.config_row(lens=LENS, rows=[], n=n, threshold=threshold)
+    fr.validate(st.config_row(lens=LENS, rows=[], n=30, threshold=30))
+
+
 def test_pending_before_n_and_config_row_recorded():
     d = st.decide(_markers(9), LENS)
     assert d["decision"] == "pending" and d["n"] == 30
