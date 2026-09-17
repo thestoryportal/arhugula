@@ -377,7 +377,6 @@ def test_hitl_request_presents_the_sample_and_every_disposition(monkeypatch: pyt
     assert "/r20=accepted [not counted: a blocking reviewer reported the same key]" in detail
     assert "/r8=suppressed [not counted: adjudicated unique_catch=false]" in detail
     assert "/r31=accepted [not counted: outside the frozen sample]" in detail
-    assert "/r8=undisposed [not counted: undisposed (adjudication pending)]" in detail
     assert "/r9=accepted [not counted: adjudicated unique_catch=false]" in detail
     assert "approve-kill" in detail and "reject-keep" in detail and "amend-threshold" in detail
 

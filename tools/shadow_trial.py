@@ -231,7 +231,8 @@ def validate_lens(lens: str) -> str:
     reviewer, whose rows are the loop's own verdicts (codex r6 P2: `decide <blocking> --hitl`
     would score ordinary review rows as a trial and enqueue a HITL over them). Parsed ONCE at
     the CLI edge ([LAW:parse-dont-validate]); the reducers take the stamped value."""
-    if lens.strip().lower() in PLACEHOLDERS or is_blocking_producer(lens):
+    forbidden = lens.strip().lower() in PLACEHOLDERS or is_blocking_producer(lens)
+    if forbidden:
         raise ValueError(
             f"shadow-trial lens {lens!r} must be a shadow producer, never a blocking reviewer "
             "or a placeholder"
