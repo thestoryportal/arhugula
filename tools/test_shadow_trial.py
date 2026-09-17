@@ -293,11 +293,23 @@ def test_hitl_request_presents_the_sample_and_every_disposition(monkeypatch: pyt
     rows.append(_row(20, "codex_review_wrapper", location="c"))  # blocked
     rows.append(_row(31, LENS, location="d", uc=True))
     rows.append(_adj(31, "d", "accepted"))  # accepted but outside the frozen sample
+    rows.append(_row(8, LENS, location="e", uc=None))  # undisposed: still presented
+    rows.append(_row(9, LENS, location="f", uc=None))
+    rows.append(
+        _row(
+            9,
+            LENS,
+            kind="finding_adjudication",
+            location="f",
+            disp="accepted",
+            actor="operator",
+            uc=False,
+        )
+    )  # adjudicated NOT unique: still presented
     d = st.decide(rows, LENS)
     assert d["unique"] == 1 and d["decision"] == "kill"
-    by_loc = {c["finding_id"]: c for c in d["catches"]}
     assert [c["counted"] for c in d["catches"]].count(True) == 1
-    assert len(by_loc) == 4  # every unique_catch row is presented, each with its reason
+    assert len(d["catches"]) == 6  # every lens finding is presented, each with its reason
     st.hitl_request(d, LENS)
     ((kind, _lane, cause, detail),) = seen
     assert kind == "DEFERRED-HIL" and cause.startswith("shadow-trial-adjudicate")
@@ -307,7 +319,69 @@ def test_hitl_request_presents_the_sample_and_every_disposition(monkeypatch: pyt
     assert "/r12=rejected [not counted: last disposition rejected]" in detail
     assert "/r20=accepted [not counted: a blocking reviewer reported the same key]" in detail
     assert "/r31=accepted [not counted: outside the frozen sample]" in detail
+    assert "/r8=undisposed [not counted: undisposed (adjudication pending)]" in detail
+    assert "/r9=accepted [not counted: adjudicated unique_catch=false]" in detail
     assert "approve-kill" in detail and "reject-keep" in detail and "amend-threshold" in detail
+
+
+# mutation-probe: drop the decision_recorded() check in deliver_decision (always deliver)
+def test_decision_is_delivered_once_per_frozen_sample(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """`decide --hitl` after round n enqueues the kill/keep request ONCE; the marker row on
+    the log is the memory, so re-running after round 31 does not enqueue it again (codex r3)."""
+    p = tmp_path / "g.jsonl"
+    for r in _markers(30):
+        fr.append_row(r, p)
+    seen: list[tuple] = []
+    monkeypatch.setattr(st, "_emit_loop_row", lambda *a: seen.append(a))
+    d1 = st.deliver_decision(LENS, p)
+    assert d1["decision"] == "kill" and d1["delivered"] is True and len(seen) == 1
+    d2 = st.deliver_decision(LENS, p)
+    assert d2["delivered"] is False and len(seen) == 1
+    fr.append_row(_row(31, LENS, kind="no_finding", location="gemini", n=31), p)
+    assert st.deliver_decision(LENS, p)["delivered"] is False and len(seen) == 1
+    markers = [r for r in fr.read_rows(p) if r["finding_type"] == st.DECISION_TYPE]
+    assert len(markers) == 1 and "decision: kill" in markers[0]["observed_evidence"]
+
+
+# mutation-probe: drop the `already` filter in request_adjudications (re-request every run)
+def test_every_undisposed_shadow_finding_is_requested_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """C-HE-29 §4: each shadow finding becomes a `shadow-trial-adjudicate` HITL row, once;
+    an adjudicated finding is never requested (codex r3 P2)."""
+    p = tmp_path / "g.jsonl"
+    a = _row(1, LENS, location="a")
+    b = _row(2, LENS, location="b")
+    fr.append_row(a, p)
+    fr.append_row(b, p)
+    fr.append_row(
+        _row(
+            2,
+            LENS,
+            kind="finding_adjudication",
+            location="b",
+            disp="rejected",
+            actor="operator",
+            uc=False,
+            ts="2026-08-18T00:00:03Z",  # an adjudication is later than its finding
+        ),
+        p,
+    )
+    seen: list[tuple] = []
+    monkeypatch.setattr(st, "_emit_loop_row", lambda *x: seen.append(x))
+    first = st.request_adjudications(LENS, p)
+    assert [f["finding_id"] for f in first] == [a["finding_id"]]
+    assert (
+        len(seen) == 1 and a["finding_id"] in seen[0][3] and "shadow-trial-adjudicate" in seen[0][3]
+    )
+    assert st.request_adjudications(LENS, p) == [] and len(seen) == 1  # idempotent
+    c = _row(3, LENS, location="c")
+    fr.append_row(c, p)
+    assert [f["finding_id"] for f in st.request_adjudications(LENS, p)] == [c["finding_id"]]
+    markers = [r for r in fr.read_rows(p) if r["finding_type"] == st.REQUEST_TYPE]
+    assert sorted(r["location"] for r in markers) == sorted([a["finding_id"], c["finding_id"]])
 
 
 def test_cli_oc_decide_and_config_if_absent(
@@ -322,6 +396,9 @@ def test_cli_oc_decide_and_config_if_absent(
     assert st.main(["decide", "--lens", LENS]) == 0
     assert '"decision": "pending"' in capsys.readouterr().out
     assert len(fr.read_rows(p)) == 3  # decide never writes
+    assert st.main(["decide", "--lens", LENS, "--hitl"]) == 0
+    assert '"delivered": false' in capsys.readouterr().out
+    assert len(fr.read_rows(p)) == 3  # a pending decision writes no marker either
     assert st.main(["config", "--lens", LENS, "--if-absent"]) == 0
     assert st.main(["config", "--lens", LENS, "--if-absent"]) == 0
     assert "already present" in capsys.readouterr().out

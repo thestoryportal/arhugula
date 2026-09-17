@@ -37,6 +37,8 @@ KILL_IF_FEWER_THAN = 2
 SCORED_KINDS = ("finding", "no_finding")
 CONFIG_PRODUCER = "shadow_trial"
 CONFIG_TYPE = "config"
+DECISION_TYPE = "decision"  # the round-n decision, recorded once per frozen sample
+REQUEST_TYPE = "adjudication-requested"  # one marker per shadow finding handed to HITL
 MERGE_GATE_PREFIX = "merge-gate-"
 #: The two families under trial: the shadow lens (gemini) and the diff's author (Claude). An
 #: adjudicator must belong to NEITHER (C-HE-29 §4); the openai family is the third party.
@@ -168,21 +170,24 @@ def decide(
         for c in unique_catches(rows, lens)
         if k < n or (c["arc_id"], c["round_n"]) in in_sample
     }
-    # Every lens finding carrying unique_catch, each marked with WHY it did or did not count,
-    # so the HITL evidence is the population the decision used (codex r2 P2).
+    # EVERY lens finding, each with its last unique_catch value and disposition and WHY it
+    # did or did not count — the §4 evidence is the sampled rounds' dispositions, so a
+    # finding adjudicated unique_catch=false or still undisposed is presented too (codex r2
+    # P2, r3 P2).
     blocking = _blocking_keys(rows)
     catches = [
         {
             "finding_id": r["finding_id"],
             "arc_id": r["arc_id"],
             "round_n": r["round_n"],
+            "unique_catch": r.get("unique_catch"),
             "disposition": r.get("disposition"),
             "in_sample": k < n or (r["arc_id"], r["round_n"]) in in_sample,
             "blocked": (r["head_sha"], r["location"], r["finding_type"]) in blocking,
             "counted": r["finding_id"] in counted_ids,
         }
         for r in fr.reduce_last_by_finding_id(rows).values()
-        if r["producer"] == lens and r.get("unique_catch")
+        if r["producer"] == lens and r["record_kind"] in ("finding", "finding_adjudication")
     ]
     base = {"n": n, "threshold": threshold, "scored": k, "catches": catches}
     if k < n:
@@ -305,9 +310,13 @@ def hitl_request(decision: dict, lens: str) -> None:
             return "COUNTED"
         if not c["in_sample"]:
             return "not counted: outside the frozen sample"
+        if c["disposition"] is None:
+            return "not counted: undisposed (adjudication pending)"
         if c["blocked"]:
             return "not counted: a blocking reviewer reported the same key"
-        return f"not counted: last disposition {c['disposition'] or 'undisposed'}"
+        if not c["unique_catch"]:
+            return "not counted: adjudicated unique_catch=false"
+        return f"not counted: last disposition {c['disposition']}"
 
     catches = (
         "; ".join(
@@ -326,6 +335,115 @@ def hitl_request(decision: dict, lens: str) -> None:
         f"sample rounds: {rounds}; unique_catch dispositions: {catches}; "
         "respond approve-kill | reject-keep | amend-threshold",
     )
+
+
+def sample_digest(sample: list[tuple[str, int]]) -> str:
+    import hashlib
+
+    return hashlib.sha1("|".join(f"{a}/{r}" for a, r in sample).encode()).hexdigest()[:12]
+
+
+def decision_recorded(rows: list[dict], lens: str, digest: str) -> bool:
+    """A round-n decision is delivered ONCE per frozen sample: its marker row on the log is
+    the memory (rows alone), so a later `decide --hitl` re-run does not enqueue it again
+    (codex r3 P3)."""
+    return any(
+        r["producer"] == CONFIG_PRODUCER
+        and r["finding_type"] == DECISION_TYPE
+        and r["location"] == lens
+        and f"sample={digest}" in r["observed_evidence"]
+        for r in rows
+    )
+
+
+def decision_marker(rows: list[dict], lens: str, decision: dict) -> dict:
+    digest = sample_digest([tuple(s) for s in decision["sample"]])
+    core = fr.FindingCore(
+        fr.next_finding_id(CONFIG_PRODUCER, DECISION_TYPE, lens, rows),
+        lens,
+        f"shadow-trial decision: {decision['decision']} n={decision['n']} "
+        f"threshold={decision['threshold']} unique={decision['unique']} sample={digest}",
+        "C-HE-29 §4",
+        "info",
+        DECISION_TYPE,
+        "policy",
+        CONFIG_PRODUCER,
+    )
+    env = fr.Envelope("no_finding", fr.now_iso(), "policy", CONFIG_PRODUCER, None, None, None, None)
+    return fr.make_row(core, env)
+
+
+def deliver_decision(lens: str, path: Path | None = None) -> dict:
+    """`decide --hitl`: compute the decision from the log; when it is not pending and no
+    marker for its frozen sample exists, append the marker and raise the HITL request. Returns
+    the decision with `delivered` (True on the first delivery, False after)."""
+    rows = fr.read_rows(path)
+    d = decide(rows, lens)
+    if d["decision"] == "pending":
+        return {**d, "delivered": False}
+    digest = sample_digest(d["sample"])
+    written = fr.append_derived(
+        lambda log: None if decision_recorded(log, lens, digest) else decision_marker(log, lens, d),
+        path,
+    )
+    if written is None:
+        return {**d, "delivered": False}
+    hitl_request(d, lens)
+    return {**d, "delivered": True}
+
+
+def undisposed_findings(rows: list[dict], lens: str) -> list[dict]:
+    last = fr.reduce_last_by_finding_id(rows)
+    return [
+        r
+        for r in last.values()
+        if r["producer"] == lens and r["record_kind"] == "finding" and r["disposition"] is None
+    ]
+
+
+def request_adjudications(lens: str, path: Path | None = None) -> list[dict]:
+    """C-HE-29 §4: every shadow finding is handed to the operator as a `shadow-trial-adjudicate`
+    HITL row, once — the request marker on the log is the memory (rows alone), so repeated
+    score runs never re-enqueue a finding (codex r3 P2). Returns the findings requested."""
+    requested: list[dict] = []
+
+    def build(rows: list[dict]) -> list[tuple[dict, fr.Envelope]]:
+        already = {
+            r["location"]
+            for r in rows
+            if r["producer"] == CONFIG_PRODUCER and r["finding_type"] == REQUEST_TYPE
+        }
+        pairs = []
+        for f in undisposed_findings(rows, lens):
+            if f["finding_id"] in already:
+                continue
+            requested.append(f)
+            core = dict(
+                location=f["finding_id"],
+                observed_evidence=f"shadow-trial adjudication requested for {lens}",
+                expected_contract="C-HE-29 §4",
+                severity="info",
+                finding_type=REQUEST_TYPE,
+                lineage_claim="policy",
+                producer=CONFIG_PRODUCER,
+            )
+            env = fr.Envelope(
+                "no_finding", fr.now_iso(), "policy", CONFIG_PRODUCER, None, None, None, None
+            )
+            pairs.append((core, env))
+        return pairs
+
+    fr.append_observations(build, path)
+    for f in requested:
+        _emit_loop_row(
+            "DEFERRED-HIL",
+            "shadow_trial",
+            "shadow-trial-adjudicate:HITL-recoverable:per_finding_disposition",
+            f"SHADOW-{lens} finding {f['finding_id']} at {f['location']} ({f['severity']}) awaits "
+            f"an adjudicator of neither family: just shadow-trial-adjudicate {f['finding_id']} "
+            "accepted|rejected|suppressed <actor>",
+        )
+    return requested
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -347,7 +465,15 @@ def main(argv: list[str] | None = None) -> int:
     ad.add_argument("--disposition", choices=("accepted", "rejected", "suppressed"), required=True)
     ad.add_argument("--actor", required=True)
     ad.add_argument("--lens", default="gemini-shadow")
+    rq = sub.add_parser(
+        "request-adjudications", help="hand every undisposed shadow finding to HITL, once"
+    )
+    rq.add_argument("--lens", required=True)
     a = p.parse_args(argv)
+    if a.cmd == "request-adjudications":
+        for f in request_adjudications(a.lens):
+            print(f["finding_id"])
+        return 0
     if a.cmd == "adjudicate":
         row = adjudicate(a.finding_id, disposition=a.disposition, actor=a.actor, lens=a.lens)
         print(json.dumps(row))
@@ -371,10 +497,8 @@ def main(argv: list[str] | None = None) -> int:
         written = fr.append_derived(build)
         print("config row appended" if written else "config row already present")
         return 0
-    d = decide(fr.read_rows(), a.lens)
+    d = deliver_decision(a.lens) if a.hitl else decide(fr.read_rows(), a.lens)
     print(json.dumps(d))
-    if a.hitl and d["decision"] != "pending":
-        hitl_request(d, a.lens)
     return 0
 
 

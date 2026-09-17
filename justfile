@@ -831,8 +831,16 @@ gemini-review base='main' outcome_json='':
 # `shadow-trial-adjudicate` — the ONE writer of `unique_catch`; `shadow-trial-decide` is the
 # read-only kill/keep reducer, `--hitl` delivering a non-pending decision as a DEFERRED-HIL row.
 shadow-trial-score base='main':
-    uv run python tools/shadow_trial.py config --lens gemini-shadow --if-absent || true
+    #!/usr/bin/env bash
+    # Never blocks ship-pr (exit 0 on every path), never silent: without a recorded rule the
+    # decision would not be reproducible from rows alone, so a failed config append SKIPS the
+    # shadow review and says so instead of scoring rounds against an unrecorded policy.
+    if ! uv run python tools/shadow_trial.py config --lens gemini-shadow --if-absent; then
+      echo "shadow-trial-score: config row not recorded; shadow review skipped this round" >&2
+      exit 0
+    fi
     HARNESS_SHADOW_LENS=1 just gemini-review {{base}} || true
+    uv run python tools/shadow_trial.py request-adjudications --lens gemini-shadow || true
 
 shadow-trial-decide lens='gemini-shadow' *ARGS:
     uv run python tools/shadow_trial.py decide --lens {{lens}} {{ARGS}}

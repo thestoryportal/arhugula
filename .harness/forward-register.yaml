@@ -71,14 +71,14 @@
 
 
 snapshot:
-  total: 244
+  total: 245
   open: 1
   design_substrate_gated: 3
-  registered_finding: 86
+  registered_finding: 87
   operator_gated: 0
   held: 3
   closed: 151
-  identity_digest: 7d7abefe01ccb705
+  identity_digest: 8a687b88662863c4
 items:
 - id: B-1
   title: Layered capability-aware routing activation
@@ -11589,3 +11589,11 @@ items:
   close_out: 'REGISTERED 2026-09-16 from the E2b evaluation (docs/research/context-stack-evals/E2b-results.md), NOT absorbed: this is a spec-versus-implementation question on a cleared CP spec (v1.119) and routes as a fork, not a patch (root CLAUDE.md §4.3). The E2b no-pack reviewer independently found the audit-key widening for non-escalating fan-out-branch gates; that part is spec-directed and its residue is a test gap (no test in #1341 exercises a non-escalating fan-out-branch gate''s key). WHAT CLOSES THIS ROW: (1) re-trace whether a post-dispatch escalation in a fan-out branch reaches `_escalate_to_secondary_channel` with the branch''s step_context (the reviewer named the dispatch loop and the durable-async branch in hitl_gate_composer.py); if it does, (2) either amend CP v1.119 to state the wider population and make the stamp conditional on the channel actually being fallback-only, or narrow the basis carry so only pre-dispatch gates mint -- an architect call, then spec-writer, then impl; (3) add the two population witnesses (non-escalating fan-out gate: byte-identical key; post-dispatch escalating fan-out gate: correct resolvability).'
   council: 'YES if step (1) confirms the path -- population semantics of a cleared contract across CP and Runtime (C1 ⊥ C10); dyadic council before the AskUserQuestion, per CLAUDE.md §13.4.'
   heading: '### B-249 · B-71 token population wider than the spec''s wording; resolvability stamp rides it *(surfaced by the E2b pack reviewer, 2026-09-16; carriers VERIFIED; REGISTERED)*'
+- id: B-250
+  title: 'C-HE-29 §2 words the scored-round denominator as COUNT(DISTINCT round_n WHERE producer=<lens>), but round numbers restart per arc; the cleared plan (U-HE-43) keys scored rounds (arc_id, round_n)'
+  pr: '#u-he-43 (surfaced by codex u-he-43 round 3; the landed reducer follows the plan body)'
+  status: registered_finding
+  summary: 'Spec text: C-HE-29 §2 defines the scored-round denominator as `COUNT(DISTINCT round_n WHERE producer=<lens>)` from merge-gate-log.jsonl. Plan body (Implementation_Plan_HE_Loop_Lanes_v1.md U-HE-43, cleared): `scored_rounds` returns DISTINCT (arc_id, round_n) with the test test_scored_rounds_are_per_arc stating that two arcs with rounds 1..15 are 30 scored rounds. C-HE-25 makes round_n a per-arc, per-producer scale (rounds restart at 1 on every arc), so the spec''s literal would count 15 for that fixture and never reach n=30 across arcs while each arc runs fewer than 30 rounds — the plan''s reading is the one that measures the lens across the loop. The landed tools/shadow_trial.py follows the plan (per [[spec-prose-plan-body-drift-pattern]]: land against the plan body, cite the spec sentence rather than relocate it).'
+  close_out: 'REGISTERED 2026-09-16 on u-he-43 (codex round 3 P2, adjudicated rejected-as-registered: the cleared plan is the execution authority for the key; the spec sentence owes a wording change-note). WHAT CLOSES THIS ROW: a Spec_HE_Loop_Lanes change-note (dated, in-place tag at C-HE-29 §2 + note at the top + successor clearance marker + `just artifact-heads-write`, the pattern X1/X2 used) restating the denominator as COUNT(DISTINCT (arc_id, round_n) WHERE producer=<lens>) and naming C-HE-25''s per-arc round scale as the reason; no code change — tools/test_shadow_trial.py::test_scored_rounds_are_per_arc is the witness the note cites.'
+  council: 'NO -- a wording defect with one consistent reading across C-HE-25/C-HE-29 and the plan; nothing to convene over.'
+  heading: '### B-250 · C-HE-29 §2 denominator wording vs the per-arc round key *(surfaced on u-he-43 codex r3, 2026-09-16; REGISTERED)*'
