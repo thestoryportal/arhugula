@@ -33,7 +33,9 @@ jobs:
       - name: Memory documentation check
         run: uv run --no-sync python tools/memory_closeout_check.py --check
       - name: Provider-free tests
-        run: uv run --no-sync pytest -m 'not e2e'
+        run: |
+          env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY -u E2B_API_KEY -u GOOGLE_APPLICATION_CREDENTIALS -u GOOGLE_CLOUD_PROJECT uv run --no-sync pytest -m 'not e2e'
+          env -u ANTHROPIC_API_KEY -u OPENAI_API_KEY -u E2B_API_KEY -u GOOGLE_APPLICATION_CREDENTIALS -u GOOGLE_CLOUD_PROJECT uv run --no-sync pytest tests tools/test_memory_closeout_check.py -q
       - name: Build and validate wheels
         run: uv run --no-sync python tools/q4_packaging_gate.py --build --check
       - name: Generate portable source package
@@ -43,5 +45,7 @@ jobs:
         run: |
           uv sync --locked --all-packages
           uv run --no-sync python tools/portable_init.py
+          uv run --no-sync python -c 'from pathlib import Path; import tomllib; p=Path("harness.toml"); text=p.read_text(); assert "/absolute/path/to/your/workspace" not in text; cfg=tomllib.loads(text)["runtime"]; assert Path(cfg["repository_root"]) == Path.cwd(); assert all(Path(e["path"]).is_relative_to(Path.cwd()) for e in cfg["path_bindings"]["raw_entries"])'
+          uv run --no-sync harness --help
           uv run --no-sync python -c 'from pathlib import Path; import harness_runtime; assert Path(harness_runtime.__file__).resolve().is_relative_to(Path.cwd())'
           uv run --no-sync pytest harness-runtime/tests/test_cli_process_exit.py harness-runtime/tests/test_portable_path_defaults.py -q
