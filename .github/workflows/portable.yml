@@ -1,0 +1,47 @@
+name: Portable deployment
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable:
+    name: Portable checks and package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHON_KEYRING_BACKEND: keyring.backends.null.Keyring
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          python-version: '3.12'
+          enable-cache: true
+      - name: Install locked portable workspace
+        run: uv sync --locked --all-packages
+      - name: Lint and typecheck
+        run: |
+          uv run --no-sync ruff check .
+          uv run --no-sync pyright
+      - name: Memory documentation check
+        run: uv run --no-sync python tools/memory_closeout_check.py --check
+      - name: Provider-free tests
+        run: uv run --no-sync pytest -m 'not e2e'
+      - name: Build and validate wheels
+        run: uv run --no-sync python tools/q4_packaging_gate.py --build --check
+      - name: Generate portable source package
+        run: uv run --no-sync python tools/portable_source_package.py "$RUNNER_TEMP/portable" --check
+      - name: Install and verify the generated package
+        working-directory: ${{ runner.temp }}/portable
+        run: |
+          uv sync --locked --all-packages
+          uv run --no-sync python tools/portable_init.py
+          uv run --no-sync python -c 'from pathlib import Path; import harness_runtime; assert Path(harness_runtime.__file__).resolve().is_relative_to(Path.cwd())'
+          uv run --no-sync pytest harness-runtime/tests/test_cli_process_exit.py harness-runtime/tests/test_portable_path_defaults.py -q

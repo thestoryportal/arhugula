@@ -3,6 +3,7 @@ name = "arhugula-harness-portable"
 description = "Runtime-first Arhugula harness source package for a clean external git repo."
 
 include_paths = [
+  ".github/workflows/portable.yml",
   ".env.example",
   ".gitattributes",
   ".gitignore",
@@ -62,6 +63,7 @@ forbidden_names = [
 ]
 
 required_target_paths = [
+  ".github/workflows/portable.yml",
   "README.md",
   "AGENTS.md",
   "justfile",
