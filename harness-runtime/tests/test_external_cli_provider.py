@@ -363,11 +363,16 @@ _READY_THEN_SLEEP = (
 class _SpawnRecorder:
     """Wraps asyncio.create_subprocess_exec to expose the spawned process."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, limit: int | None = None) -> None:
         self.processes: list[asyncio.subprocess.Process] = []
         self._real = asyncio.create_subprocess_exec
+        self._limit = limit
 
     async def __call__(self, *args: object, **kwargs: object) -> asyncio.subprocess.Process:
+        if self._limit is not None:
+            # A small StreamReader limit makes the reader pause as soon as
+            # unconsumed output piles up, so buffer pressure is deterministic.
+            kwargs["limit"] = self._limit
         process = await self._real(*args, **kwargs)  # type: ignore[arg-type]
         self.processes.append(process)
         return process
@@ -473,3 +478,95 @@ async def test_asyncio_runner_missing_executable_is_command_error(tmp_path: Path
         await AsyncioSubprocessRunner().run((missing,), stdin="", timeout_seconds=5.0)
 
     assert exc_info.value.exit_code == 127
+
+
+_READY_THEN_FLOOD = (
+    "import os, sys\n"
+    "fd = int(sys.argv[1])\n"
+    "ready = sys.argv[2]\n"
+    "with open(ready + '.tmp', 'w') as fh:\n"
+    "    fh.write(str(os.getpid()))\n"
+    "os.replace(ready + '.tmp', ready)\n"
+    "chunk = b'x' * 65536\n"
+    "while True:\n"
+    "    os.write(fd, chunk)\n"
+)
+_FLOOD_STREAM_LIMIT = 1024
+_BOUNDED_FINISH_SECONDS = 5.0
+
+
+async def _drain_and_reap_flood(
+    recorder: _SpawnRecorder, task: asyncio.Task[CLIProcessResult]
+) -> None:
+    """Always unblock a stuck runner (even on RED) by draining its pipes."""
+    for process in recorder.processes:
+        if process.returncode is None:
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
+        if not task.done():
+            await asyncio.wait_for(process.communicate(), timeout=10.0)
+    if not task.done():
+        task.cancel()
+    await asyncio.wait([task], timeout=10.0)
+    if task.done() and not task.cancelled():
+        task.exception()  # Mark retrieved; assertions report the real outcome.
+    await _reap_leftovers(recorder)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("fd", "stream_name"), [(1, "stdout"), (2, "stderr")])
+async def test_asyncio_runner_cancellation_drains_high_output_child(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fd: int, stream_name: str
+) -> None:
+    recorder = _SpawnRecorder(limit=_FLOOD_STREAM_LIMIT)
+    monkeypatch.setattr(external_cli_provider.asyncio, "create_subprocess_exec", recorder)
+    ready = tmp_path / "ready"
+    task = asyncio.ensure_future(
+        AsyncioSubprocessRunner().run(
+            (sys.executable, "-c", _READY_THEN_FLOOD, str(fd), str(ready)),
+            stdin="prompt",
+            timeout_seconds=60.0,
+        )
+    )
+    try:
+        await _wait_for_ready(ready, task)
+        await asyncio.sleep(0.05)  # Let the child fill the pipe.
+        assert len(recorder.processes) == 1
+        process = recorder.processes[0]
+        assert process.returncode is None
+
+        task.cancel()
+        done, _ = await asyncio.wait([task], timeout=_BOUNDED_FINISH_SECONDS)
+
+        assert task in done, f"runner hung after cancellation with {stream_name} flooding"
+        assert task.cancelled()
+        assert process.returncode is not None
+    finally:
+        await _drain_and_reap_flood(recorder, task)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("fd", "stream_name"), [(1, "stdout"), (2, "stderr")])
+async def test_asyncio_runner_timeout_drains_high_output_child(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fd: int, stream_name: str
+) -> None:
+    recorder = _SpawnRecorder(limit=_FLOOD_STREAM_LIMIT)
+    monkeypatch.setattr(external_cli_provider.asyncio, "create_subprocess_exec", recorder)
+    task = asyncio.ensure_future(
+        AsyncioSubprocessRunner().run(
+            (sys.executable, "-c", _READY_THEN_FLOOD, str(fd), str(tmp_path / "ready")),
+            stdin="prompt",
+            timeout_seconds=0.5,
+        )
+    )
+    try:
+        done, _ = await asyncio.wait([task], timeout=_BOUNDED_FINISH_SECONDS)
+
+        assert task in done, f"runner hung after timeout with {stream_name} flooding"
+        assert isinstance(task.exception(), ExternalCLIProcessTimeout)
+        assert len(recorder.processes) == 1
+        assert recorder.processes[0].returncode is not None
+    finally:
+        await _drain_and_reap_flood(recorder, task)

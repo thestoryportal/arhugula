@@ -167,8 +167,16 @@ class AsyncioSubprocessRunner:
         )
 
 
+_DISCARD_CHUNK_BYTES = 65536
+
+
 async def _kill_and_reap(process: asyncio.subprocess.Process) -> None:
-    """Kill the direct child if still running, close stdin and wait for exit."""
+    """Kill the direct child if still running, close stdin and wait for exit.
+
+    stdout/stderr are drained (and discarded) alongside the wait: a cancelled
+    ``communicate`` can leave a reader paused on a full buffer, and the pipe
+    then never reports EOF, so ``process.wait()`` alone would never return.
+    """
     if process.returncode is None:
         try:
             process.kill()
@@ -176,7 +184,19 @@ async def _kill_and_reap(process: asyncio.subprocess.Process) -> None:
             pass  # Exited between the returncode check and the kill.
     if process.stdin is not None and not process.stdin.is_closing():
         process.stdin.close()
-    await process.wait()
+    await asyncio.gather(
+        _discard_output(process.stdout),
+        _discard_output(process.stderr),
+        process.wait(),
+    )
+
+
+async def _discard_output(stream: asyncio.StreamReader | None) -> None:
+    """Read a stream to EOF in bounded chunks without retaining the data."""
+    if stream is None:
+        return
+    while await stream.read(_DISCARD_CHUNK_BYTES):
+        pass
 
 
 class RecordingSubprocessRunner:
