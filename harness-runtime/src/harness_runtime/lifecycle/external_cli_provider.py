@@ -152,15 +152,31 @@ class AsyncioSubprocessRunner:
                 timeout=timeout_seconds,
             )
         except TimeoutError as exc:
-            process.kill()
-            await process.wait()
+            await _kill_and_reap(process)
             raise ExternalCLIProcessTimeout(argv[0], timeout_seconds) from exc
+        except BaseException:
+            # Cancellation (or any other interruption) must not orphan the
+            # direct child. Descendants of the child are not tracked here.
+            await _kill_and_reap(process)
+            raise
 
         return CLIProcessResult(
             exit_code=process.returncode or 0,
             stdout=stdout_bytes.decode("utf-8", errors="replace"),
             stderr=stderr_bytes.decode("utf-8", errors="replace"),
         )
+
+
+async def _kill_and_reap(process: asyncio.subprocess.Process) -> None:
+    """Kill the direct child if still running, close stdin and wait for exit."""
+    if process.returncode is None:
+        try:
+            process.kill()
+        except ProcessLookupError:
+            pass  # Exited between the returncode check and the kill.
+    if process.stdin is not None and not process.stdin.is_closing():
+        process.stdin.close()
+    await process.wait()
 
 
 class RecordingSubprocessRunner:
