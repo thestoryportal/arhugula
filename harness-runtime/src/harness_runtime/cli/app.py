@@ -616,7 +616,8 @@ def main() -> None:
     )
 
     try:
-        app(standalone_mode=False)
+        # [LAW:no-silent-failure] Non-standalone Click returns command exit codes.
+        raise SystemExit(app(standalone_mode=False))
     except _UsageError as exc:
         # Click's default formatter writes "Usage: ..." + "Error: ..." to
         # stderr. Mirror that, then append the fail-class line per spec.

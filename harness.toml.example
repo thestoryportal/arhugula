@@ -154,10 +154,9 @@ otlp_endpoint = "http://127.0.0.1:4317"
 #
 # IMPORTANT — `workflow_class` MUST match the `[workflow].workload_class`
 # of the manifests you intend to run, or bootstrap stage IS-1 will not
-# find a binding for that workflow. The values below are
-# "pipeline-automation" to match the shipped `examples/minimal.toml`
-# (the MVP smoke). If you run software-engineering workflows instead,
-# change all four to "software-engineering" (or add a second set of four).
+# find a binding for that workflow. Both the shipped pipeline smoke and
+# the daemon's software-engineering bootstrap have bindings below.
+# STATE_LEDGER is a directory; the runtime appends `state.jsonl`.
 [[runtime.path_bindings.raw_entries]]
 path_class = "SKILLS"
 workflow_class = "pipeline-automation"
@@ -180,7 +179,31 @@ path = "/absolute/path/to/your/workspace/routing_manifest"
 path_class = "STATE_LEDGER"
 workflow_class = "pipeline-automation"
 deployment_surface = "local-development"
-path = "/absolute/path/to/your/workspace/.harness/state.jsonl"
+path = "/absolute/path/to/your/workspace/.harness"
+
+[[runtime.path_bindings.raw_entries]]
+path_class = "SKILLS"
+workflow_class = "software-engineering"
+deployment_surface = "local-development"
+path = "/absolute/path/to/your/workspace/skills"
+
+[[runtime.path_bindings.raw_entries]]
+path_class = "PROMPTS"
+workflow_class = "software-engineering"
+deployment_surface = "local-development"
+path = "/absolute/path/to/your/workspace/prompts"
+
+[[runtime.path_bindings.raw_entries]]
+path_class = "ROUTING_MANIFEST"
+workflow_class = "software-engineering"
+deployment_surface = "local-development"
+path = "/absolute/path/to/your/workspace/routing_manifest"
+
+[[runtime.path_bindings.raw_entries]]
+path_class = "STATE_LEDGER"
+workflow_class = "software-engineering"
+deployment_surface = "local-development"
+path = "/absolute/path/to/your/workspace/.harness"
 
 
 # REQUIRED for any workflow that dispatches an inference step: the routing
