@@ -36,7 +36,7 @@ placement = "SELF_HOSTED_BACKEND_COLLECTOR"
 path_class = "SKILLS"
 workflow_class = "pipeline-automation"
 deployment_surface = "self-hosted-server"
-path = "/absolute/path/to/arhugula-v2/.agents/skills"
+path = "/absolute/path/to/arhugula-v2/skills"
 
 [[runtime.path_bindings.raw_entries]]
 path_class = "PROMPTS"
@@ -54,13 +54,13 @@ path = "/absolute/path/to/arhugula-v2/routing_manifest"
 path_class = "STATE_LEDGER"
 workflow_class = "pipeline-automation"
 deployment_surface = "self-hosted-server"
-path = "/absolute/path/to/arhugula-v2/.harness/state.jsonl"
+path = "/absolute/path/to/arhugula-v2/.harness"
 
 [[runtime.path_bindings.raw_entries]]
 path_class = "SKILLS"
 workflow_class = "software-engineering"
 deployment_surface = "self-hosted-server"
-path = "/absolute/path/to/arhugula-v2/.agents/skills"
+path = "/absolute/path/to/arhugula-v2/skills"
 
 [[runtime.path_bindings.raw_entries]]
 path_class = "PROMPTS"
@@ -78,7 +78,7 @@ path = "/absolute/path/to/arhugula-v2/routing_manifest"
 path_class = "STATE_LEDGER"
 workflow_class = "software-engineering"
 deployment_surface = "self-hosted-server"
-path = "/absolute/path/to/arhugula-v2/.harness/state.jsonl"
+path = "/absolute/path/to/arhugula-v2/.harness"
 
 [[runtime.mcp_clients]]
 client_name = "r420-echo"

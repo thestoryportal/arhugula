@@ -78,6 +78,16 @@ r420-self-hosted-stack-status:
 r420-self-hosted-readiness config:
     uv run python tools/self_hosted_readiness.py --config {{config}}
 
+# Live e2e proofs against the local self-hosted stack (daemon, OTLP, keyring).
+r420-self-hosted-live-e2e config *args:
+    uv run python tools/r420_self_hosted_live_e2e.py "$@"
+
+r430-tail-keep-live-e2e config *args:
+    uv run python tools/r430_tail_keep_collector_live_e2e.py "$@"
+
+r500-multitenant-live-e2e config *args:
+    uv run python tools/r500_multitenant_selfhosted_live_e2e.py "$@"
+
 r421-managed-cloud-readiness config *args:
     uv run python tools/managed_cloud_readiness.py --config {{config}} {{args}}
 

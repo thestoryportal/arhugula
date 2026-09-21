@@ -37,6 +37,9 @@ READINESS_RECIPES = (
     "q4-packaging-check",
     "r420-self-hosted-stack-up",
     "r420-self-hosted-readiness",
+    "r420-self-hosted-live-e2e",
+    "r430-tail-keep-live-e2e",
+    "r500-multitenant-live-e2e",
     "r421-managed-cloud-readiness",
     "sandbox-host-check",
 )
