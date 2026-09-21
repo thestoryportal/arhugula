@@ -43,7 +43,7 @@ path = "/absolute/path/to/arhugula/routing_manifest"
 path_class = "STATE_LEDGER"
 workflow_class = "research"
 deployment_surface = "local-development"
-path = "/absolute/path/to/arhugula/.harness/state.jsonl"
+path = "/absolute/path/to/arhugula/.harness"
 
 [runtime.routing_manifest]
 manifest_version = 1
